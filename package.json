@@ -4,7 +4,7 @@
   "description": "To make it easy for you to get started with GitLab, here's a list of recommended next steps.",
   "main": "server.js",
   "scripts": {
-   "test": "echo \"No tests configured\"",
+    "test": "echo \"No tests configured\"",
     "start": "nodemon server.js"
   },
   "repository": {
@@ -52,7 +52,7 @@
     "nodemailer": "^6.7.7",
     "nodemon": "^3.0.1",
     "short-unique-id": "^4.4.4",
-    "socket.io": "^4.7.5",
+    "socket.io": "^4.8.1",
     "stripe": "^14.19.0",
     "twilio": "^4.23.0",
     "uuid": "^8.3.2",

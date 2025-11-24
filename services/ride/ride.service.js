@@ -2,6 +2,7 @@ const Ride = require("../../models/ride.model");
 const { responseData } = require("../../helpers/responseData");
 const { calculateDistanceInKm } = require("../../helpers/distance");
 const { calculateFare } = require("../../helpers/fareConfig");
+const { sendRideToDriver } = require("../../socket/emitRide");
 
 /**
  * Create a new ride request
@@ -68,6 +69,12 @@ module.exports.createRide = async (req, res) => {
       paymentMethod: paymentMethod || "cash",
       status: "requested",
     });
+
+    // TEMP: Hardcode driverId for testing OR pass logic later
+    const testDriverId = "6923ec23911e2418b1c4139e";  // replace manually
+
+    sendRideToDriver(testDriverId, ride);
+
 
     // ----------------------------
     // RESPONSE
