@@ -1,0 +1,67 @@
+<html>
+
+<head>
+    <style>
+        table,
+        th, td {
+            padding: 15px;
+            text-align: left;
+        }
+
+        #customers {
+            font-family: Arial, Helvetica, sans-serif;
+            border-collapse: collapse;
+            width: 100%;
+        }
+
+        #customers td, #customers th {
+            border: 1px solid #ddd;
+            padding: 8px;
+        }
+
+        #customers tr:nth-child(even){background-color: #f2f2f2;}
+
+        #customers tr:hover {background-color: #ddd;}
+
+        #customers th {
+            padding-top: 12px;
+            padding-bottom: 12px;
+            text-align: left;
+            background-color: #6236FF;
+            color: white;
+        }
+
+    </style>
+</head>
+
+<body> 
+   <div style="display:flex; align-items: center; justify-content: space-between; padding:15px; margin-bottom: 20px;">
+        <div><img src="http://3.111.190.184/alpay/logo.png" /></div>
+        <div><h4>Generate By</h4><%= pdf_options.generateBy %></div>
+        <div><h4>Generate At</h4><%= pdf_options.generateAt %></div>
+    </div>
+    <table  id="customers">
+        <tr>
+            <th>#</th>
+            <th>User Name</th>
+            <th>User ID</th>
+            <th>Status</th>
+            <th>Transaction Amount</th>
+            <th>Coupon avails</th>
+            <th>Created at</th>
+        </tr>
+        <% for (var i = 0; i < reportData.length; i++) { %>
+            <tr>
+                <td><%= i+1 %></td>
+                <td><%= reportData[i]?.first_name %> <%= reportData[i]?.last_name %></td>
+                <td><%= reportData[i]?._id %></td>
+                <td><%= reportData[i]?.status %></td>
+                <td><%= reportData[i]?.transaction_amount %></td>
+                <td><%= reportData[i]?.coupon_avails %></td>
+                <td><%= reportData[i]?.createdAt %></td>
+            </tr>
+        <% } %>
+    </table> 
+</body>
+
+</html>

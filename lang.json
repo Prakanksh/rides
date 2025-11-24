@@ -1,0 +1,982 @@
+{
+  "ALREADY_EXISTS": {
+    "en": "User already exists either with email or mobile.",
+    "ar": ""
+  },
+  "ADMIN_SUB_ADMIN_ALREADY_EXISTS": {
+    "en": "Admin already exists either with email or mobile.",
+    "ar": ""
+  },
+  "OTP_SENT": {
+    "en": "OTP sent successfully to your mobile number.",
+    "ar": ""
+  },
+  "EMAIL_OTP_SENT": {
+    "en": "OTP sent successfully to your email.",
+    "ar": ""
+  },
+  "ERROR_OCCUR": {
+    "en": "Something went wrong.",
+    "ar": ""
+  },
+  "GET_LIST": {
+    "en": "List fetched successfully.",
+    "ar": ""
+  },
+  "INVALID_MOBILE_OTP": {
+    "en": "Invalid mobile OTP.",
+    "ar": ""
+  },
+  "INVALID_STATUS": {
+    "en": "Invalid status.",
+    "ar": ""
+  },
+  "NAME_EMPTY": {
+    "en": "Please enter name.",
+    "al": ""
+  },
+  "TITLE_EMPTY": {
+    "en": "Please enter title.",
+    "al": ""
+  },
+  "INVALID_EMAIL_OTP": {
+    "en": "Invalid email OTP.",
+    "ar": ""
+  },
+  "EMAIL_EXIST": {
+    "en": "This email id is already registered.",
+    "ar": ""
+  },
+  "NO_USER_EXIST": {
+    "en": "User is not registered.",
+    "ar": ""
+  },
+  "MOBILE_EXIST": {
+    "en": "This mobile number is already registered.",
+    "ar": ""
+  },
+  "USERNAME_EXIST": {
+    "en": "This username is already registered.",
+    "ar": ""
+  },
+  "ACCOUNT_LOGIN": {
+    "en": "Account login successfully",
+    "ar": ""
+  },
+  "INVALID_LOGIN": {
+    "en": "Invalid email or pass code.",
+    "ar": ""
+  },
+  "PASSWORD_EMPTY": {
+    "en": "Please enter your pass code.",
+    "ar": ""
+  },
+  "ACCOUNT_DE_ACTIVE": {
+    "en": "Account is deactivated. Please contact to administrator.",
+    "ar": ""
+  },
+  "INVALID_LOGIN_MOBILE": {
+    "en": "Invalid mobile number or password.",
+    "ar": ""
+  },
+  "PASSWORD_CHANGED": {
+    "en": "Password changed successfully.",
+    "ar": ""
+  },
+  "PASSWORD_RESET_SUCCESS": {
+    "en": "Password reset successfully.",
+    "ar": ""
+  },
+  "OLD_PASSWORD_REQUIRED": {
+    "en": "Old password is required",
+    "ar": ""
+  },
+  "ACCESS_TOKEN_REQUIRED": {
+    "en": "Access token is required",
+    "ar": ""
+  },
+  "NEW_PASSWORD_REQUIRED": {
+    "en": "New password is required",
+    "ar": ""
+  },
+  "INVALID_OLD_PASSWORD": {
+    "en": "You have entered an incorrect old password.",
+    "ar": ""
+  },
+  "OTP_SUCCESSFULLY_SEND": {
+    "en": "OTP successfully send.",
+    "ar": ""
+  },
+  "OTP_INCORRECT": {
+    "en": "You have entered an incorrect OTP.",
+    "ar": ""
+  },
+  "OTP_VERIFIED": {
+    "en": "OTP verified successfully.",
+    "ar": ""
+  },
+  "OTP_NOT_VERIFIED": {
+    "en": "Invalid OTP, Please try again.",
+    "ar": ""
+  },
+  "OTP_SENT_AGAIN": {
+    "en": "OTP sent successfully to your mobile again.",
+    "ar": ""
+  },
+  "USER_UPDATE_SUCCESS": {
+    "en": "User profile updated successfully.",
+    "ar": ""
+  },
+  "PRODUCT_UPDATE_SUCCESS": {
+    "en": "Product details updated successfully.",
+    "ar": ""
+  },
+  "USER_TYPE_REQUIRED": {
+    "en": "User type is required.",
+    "ar": ""
+  },
+  "REGISTRATION_TYPE_REQUIRED": {
+    "en": "Registration type is required.",
+    "ar": ""
+  },
+  "PROFILE_DETAILS": {
+    "en": "Profile details fetched successfully.",
+    "ar": ""
+  },
+  "NOT_AUTHORIZED": {
+    "en": "You are not authorized to access this app",
+    "ar": ""
+  },
+  "ADMIN_NOT_FOUND": {
+    "en": "Admin not found.",
+    "ar": ""
+  },
+  "DETAILS_FETCHED": {
+    "en": "Details fetched successfully.",
+    "ar": ""
+  },
+  "NOT_FOUND": {
+    "en": "Not found",
+    "ar": ""
+  },
+  "CATEGORY_ALREADY_EXIST": {
+    "en": "This category already exists.",
+    "ar": ""
+  },
+  "BANNER_ALREADY_EXIST": {
+    "en": "This banner already exists.",
+    "ar": ""
+  },
+  "CATEGORY_ADDED": {
+    "en": "Category has been added successfully into the system.",
+    "ar": ""
+  },
+  "BANNER_ADDED": {
+    "en": "Banner has been added successfully into the system.",
+    "ar": ""
+  },
+  "CATEGORY_UPDATED": {
+    "en": "Category updated successfully.",
+    "ar": ""
+  },
+  "BANNER_UPDATED": {
+    "en": "Banner updated successfully.",
+    "ar": ""
+  },
+  "BANNER_DELETED": {
+    "en": "Banner deleted successfully.",
+    "ar": ""
+  },
+  "EMAIL_TEMPLATE_ADDED": {
+    "en": "Email template added successfully.",
+    "ar": ""
+  },
+  "MOBILE_NOT_VERIFIED": {
+    "en": "Your mobile is not verified. Please verify your mobile to login.",
+    "ar": ""
+  },
+  "EMAIL_TEMPLATE_UPDATED": {
+    "en": "Email template updated successfully.",
+    "ar": ""
+  },
+  "EMAIL_TEMPLATE_ALREADY_EXIST": {
+    "en": "This email template already exists.",
+    "ar": ""
+  },
+  "EMAIL_TEMPLATE_STATUS_UPDATED": {
+    "en": "Email template status updated successfully.",
+    "ar": ""
+  },
+  "CATEGORY_STATUS_UPDATED": {
+    "en": "Category status updated successfully.",
+    "ar": ""
+  },
+  "PRODUCT_STATUS_UPDATED": {
+    "en": "Product status updated successfully.",
+    "ar": ""
+  },
+  "MOBILE_VERIFIED": {
+    "en": "Mobile verified successfully",
+    "ar": ""
+  },
+  "EMAIL_VERIFIED": {
+    "en": "Email verified successfully",
+    "ar": ""
+  },
+  "SUB_ADMIN_ADD_SUCCESS": {
+    "en": "Sub Admin added successfully.",
+    "ar": ""
+  },
+  "SETTINGS_UPDATED_SUCCESSFULLY": {
+    "en": "Settings updated successfully",
+    "ar": ""
+  },
+  "NO_USER_FOUND": {
+    "en": "No user found",
+    "ar": ""
+  },
+  "ADMIN_UPDATE_SUCCESS": {
+    "en": "Admin profile updated successfully. ",
+    "ar": ""
+  },
+  "SUB_ADMIN_UPDATE_SUCCESS": {
+    "en": "Sub Admin details updated successfully. ",
+    "ar": ""
+  },
+  "UPDATE_SUCCESS": {
+    "en": "Static content details updated successfully. ",
+    "ar": ""
+  },
+  "STATIC_ADDED_SUCCESS": {
+    "en": "Static content added successfully. ",
+    "ar": ""
+  },
+  "STATIC_STATUS_UPDATE": {
+    "en": "Static content status updated successfully. ",
+    "ar": ""
+  },
+  "STATIC_CONTENT_NOT_FOUND": {
+    "en": "Static content not found. ",
+    "ar": ""
+  },
+  "SUB_ADMIN_NOT_FOUND": {
+    "en": "Sub Admin not found. ",
+    "ar": ""
+  },
+  "NOTIFICATION_CREATED": {
+    "en": "Notification send successfully.",
+    "ar": ""
+  },
+  "EMAIL_SENT": {
+    "en": "Reset password link has been sent to your email successfully.",
+    "ar": ""
+  },
+  "ADMIN_INVALID_LOGIN": {
+    "en": "Invalid email ID or password.",
+    "al": ""
+  },
+  "NOTIFICATION_TOGGLE_UPDATED": {
+    "en": "Notification toggle updated successfully.",
+    "ar": "تم حذف مساعد المدير بنجاح."
+  },
+  "FAQ_EXIST": {
+    "en": "FAQ with same title already exists.",
+    "ar": "يوجد قائمة أسئلة شائعة بهذا الاسم مسبقاً."
+  },
+  "FAQ_CREATED": {
+    "en": "FAQ created successfully.",
+    "ar": "تم إنشاء قسم الأسئلة الشائعة بنجاح."
+  },
+  "FAQ_UPDATED": {
+    "en": "FAQ updated successfully.",
+    "ar": "تم تحديث قسم الأسئلة الشائعة بنجاح."
+  },
+  "ID_UNAVAILABLE": {
+    "en": "Requested data not found with given ID.",
+    "ar": "لم يتم العثور على البيانات المطلوبة بالهوية التي تم إدخالها."
+  },
+  "FAQ_DELETED": {
+    "en": "FAQ deleted successfully.",
+    "ar": "تم حذف قسم الأسئلة الشائعة بنجاح."
+  },
+  "FAQ_STATUS_UPDATE": {
+    "en": "FAQ status updated successfully.",
+    "ar": "تم تحديث حالة الأسئلة الشائعة بنجاح."
+  },
+  "SOCIAL_ID_EXIST": {
+    "en": "Social ID already exist.",
+    "ar": "تم تحديث حالة الأسئلة الشائعة بنجاح."
+  },
+  "PRODUCT_EXIST": {
+    "en": "Product already exist.",
+    "ar": "تم تحديث حالة الأسئلة الشائعة بنجاح."
+  },
+  "SOCIAL_ID_REQUIRED": {
+    "en": "Social id is required in case of social signup.",
+    "ar": "تم تحديث حالة الأسئلة الشائعة بنجاح."
+  },
+  "SOCIAL_ACCOUNT_NOT_EXIST": {
+    "en": "User not found with this social ID.",
+    "ar": "تم تحديث حالة الأسئلة الشائعة بنجاح."
+  },
+  "REFRESH_TOKEN_EMPTY": {
+    "en": "Please provide refresh token.",
+    "ar": "تم تحديث حالة الأسئلة الشائعة بنجاح."
+  },
+  "INVALID_REF_TOKEN": {
+    "en": "Invalid refresh token.",
+    "al": "Kredencialet referuese te pavlefshme"
+  },
+  "TOKEN_REGENERATE": {
+    "en": "Token regenerated successfully.",
+    "al": "Kredencialet u rigjeneruan me sukses"
+  },
+  "EMAIL_TEMPLATE_STATUS_UPDATE": {
+    "en": "Email Template status updated successfully.",
+    "ar": "الرجاء إدخال عنوان البريد الإلكتروني الخاص بك."
+  },
+  "USER_NOT_FOUND": {
+    "en": "Mobile number not found. Please enter a valid mobile number.",
+    "ar": "الرجاء إدخال عنوان البريد الإلكتروني الخاص بك."
+  },
+  "USER_INACTIVE": {
+    "en": "User is inactive by Admin please contact to admin.",
+    "ar": "الرجاء إدخال عنوان البريد الإلكتروني الخاص بك."
+  },
+  "ACCOUNT_INACTIVE": {
+    "en": "Your account is inactive please contact to admin.",
+    "ar": "الرجاء إدخال عنوان البريد الإلكتروني الخاص بك."
+  },
+  "DOB_REQUIRED": {
+    "en": "DOB field is a required field.",
+    "ar": ""
+  },
+  "LOGOUT": {
+    "en": "User logged out successfully.",
+    "ar": "لا يمكن أن يكون النوع فارغًا ، سواء أكان تاجرًا أم وكيلً."
+  },
+  "UNAUTHENTICATED": {
+    "en": "Admin have deactivated or deleted your account.",
+    "ar": "لا يمكن أن يكون النوع فارغًا ، سواء أكان تاجرًا أم وكيلً."
+  },
+  "MOBILE_OTP_EXPIRED": {
+    "en": "Your mobile otp is expired.",
+    "ar": "الرجاء إدخال عنوان البريد الإلكتروني الخاص بك."
+  },
+  "PASSWORD_SAME_ERORR": {
+    "en": "Old password and new password cannot be the same.",
+    "al": ""
+  },
+  "EMAIL_REQUIRED": {
+    "en": "Email field required.",
+    "ar": ""
+  },
+  "PASSWORD_REQUIRED": {
+    "en": "Password field required.",
+    "ar": ""
+  },
+  "FIRST_NAME_REQUIRED": {
+    "en": "FirstName field required.",
+    "ar": ""
+  },
+  "USERNAME_REQUIRED": {
+    "en": "User name field required.",
+    "ar": ""
+  },
+  "FULLNAME_REQUIRED": {
+    "en": "Full name field required.",
+    "ar": ""
+  },
+  "COUNTRY_CODE_REQUIRED": {
+    "en": "Country Code field required.",
+    "ar": ""
+  },
+  "MOBILE_OTP_ID_REQUIRED": {
+    "en": "OTP Id required.",
+    "ar": ""
+  },
+  "EMAIL_OTP_ID_REQUIRED": {
+    "en": "OTP Id required.",
+    "ar": ""
+  },
+  "COUNTRY_REQUIRED": {
+    "en": "Country field required.",
+    "ar": ""
+  },
+  "MOBILE_REQUIRED": {
+    "en": "Mobile number is required.",
+    "ar": ""
+  },
+  "PASS_CODE_CREATED": {
+    "en": "Passcode created.",
+    "ar": ""
+  },
+  "UPDATE_PROFILE_PIC": {
+    "en": "Profile pic updated successfully.",
+    "ar": "تم حذف مساعد المدير بنجاح."
+  },
+  "IMAGE_REQUIRED": {
+    "en": "Image is required.",
+    "ar": "تم حذف مساعد المدير بنجاح."
+  },
+  "KYC_DOC_REQUIRED": {
+    "en": "To proceed KYC please upload at least one document image.",
+    "ar": "تم حذف مساعد المدير بنجاح."
+  },
+  "PASS_CODE_REQUIRED": {
+    "en": "Passcode is required.",
+    "ar": "تم حذف مساعد المدير بنجاح."
+  },
+  "PASS_CODE_LENGTH_MIN": {
+    "en": "Passcode length should be at least six digits.",
+    "ar": "تم حذف مساعد المدير بنجاح."
+  },
+  "PASS_CODE_LENGTH_MAX": {
+    "en": "Passcode length should not exceed six digits.",
+    "ar": "تم حذف مساعد المدير بنجاح."
+  },
+  "OTP_REQUIRED": {
+    "en": "Otp is required.",
+    "ar": "تم حذف مساعد المدير بنجاح."
+  },
+  "STATUS_UPDATE": {
+    "en": "Status updated successfully.",
+    "ar": "تم حذف مساعد المدير بنجاح."
+  },
+  "ADMIN_NOT_EXIST": {
+    "en": "Admin does not exist.",
+    "ar": "فشل حفظ مستند الهوية. يرجى التحقق من المعلومات التي قدمتها والمحاولة مرة أخرى."
+  },
+  "ADMIN_SETTING_ALREADY_ADDED": {
+    "en": "Admin setting already exists.",
+    "ar": "تمت إضافة إعدادات المسؤول بالفعل. يرجى التحقق من المعلومات التي قدمتها والمحاولة مرة أخرى."
+  },
+  "PROFILE_PIC_REQUIRED": {
+    "en": "Profile picture is required.",
+    "ar": "تم حذف مساعد المدير بنجاح."
+  },
+  "PROFILE_LIST": {
+    "en": "Profile fetched successfully.",
+    "ar": "تم حذف مساعد المدير بنجاح."
+  },
+  "LINK_INVALID": {
+    "en": "Link is not valid",
+    "ar": "يجب أن يكون عدد كوبونات المستخدم أكبر من أو يساوي 1."
+  },
+  "PASSWORD_SAME_ERROR": {
+    "en": "Old password and new password cannot be the same.",
+    "ar": "لا يمكن أن يكون كلمة المرور القديمة والجديدة متطابقتين."
+  },
+  "COUNTRY_LIST": {
+    "en": "Country list fetched successfully.",
+    "ar": "تم جلب قائمة البلدان بنجاح."
+  },
+  "CONTENT_LIST": {
+    "en": "Content fetched successfully.",
+    "ar": "تم جلب قائمة البلدان بنجاح."
+  },
+  "COUNTRY_NAME_EMPTY": {
+    "en": "Country name is required.",
+    "ar": "تم جلب قائمة البلدان بنجاح."
+  },
+  "ISO_CODE_EMPTY": {
+    "en": "ISO code is required.",
+    "ar": "تم جلب قائمة البلدان بنجاح."
+  },
+  "SLUG_EMPTY": {
+    "en": "Slug is required.",
+    "ar": "تم جلب قائمة البلدان بنجاح."
+  },
+  "CONTENT_NOT_FOUND": {
+    "en": "Content not found by this slug.",
+    "ar": "تم جلب قائمة البلدان بنجاح."
+  },
+  "NOTIFICATION_STATUS_UPDATED": {
+    "en": "Notification status updated successfully.",
+    "ar": "تم جلب قائمة البلدان بنجاح."
+  },
+  "USER_DELETED": {
+    "en": "User account deleted successfully.",
+    "ar": "تم إرسال التقييم بنجاح."
+  },
+  "ID_REQUIRED": {
+    "en": "ID is required.",
+    "ar": "السائح غير موجود."
+  },
+  "STATUS_IS_REQUIRED": {
+    "en": "Status is required.",
+    "ar": "السائح غير موجود."
+  },
+  "GLOBAL_SETTING": {
+    "en": "Global setting details fetch successfully.",
+    "ar": "الرجاء إدخال عنوان البريد الإلكتروني الخاص بك."
+  },
+  "AMOUNT_NOT_LESS_THAN_ZERO": {
+    "en": "Amount must be greater than 0.",
+    "ar": "الرجاء إدخال عنوان البريد الإلكتروني الخاص بك."
+  },
+  "INVALID_MONGODB_ID": {
+    "en": "Given id is not valid please give valid id",
+    "ar": "الرجاء إدخال عنوان البريد الإلكتروني الخاص بك."
+  },
+  "USER_ALREADY_DELETED": {
+    "en": "User is already deleted.",
+    "ar": "الرجاء إدخال عنوان البريد الإلكتروني الخاص بك."
+  },
+  "TRANSACTION_DETAILS": {
+    "en": "Transaction details fetched successfully.",
+    "ar": "الرجاء إدخال عنوان البريد الإلكتروني الخاص بك."
+  },
+  "AMOUNT_ADD_SUCCESS": {
+    "en": "Amount added successfully.",
+    "ar": "الرجاء إدخال عنوان البريد الإلكتروني الخاص بك."
+  },
+  "PRODUCT_ADD_SUCCESS": {
+    "en": "Product added successfully.",
+    "ar": "الرجاء إدخال عنوان البريد الإلكتروني الخاص بك."
+  },
+  "AMOUNT_EMPTY": {
+    "en": "Amount cannot be empty.",
+    "ar": "لا يمكن أن يكون مبلغ الكوبون فارغًا."
+  },
+  "AMOUNT_SHOULD_BE_GREATER_THAN_0": {
+    "en": "Amount should be greater than 0.",
+    "ar": "يجب أن يكون مبلغ الكوبون أكبر من 0."
+  },
+  "AMOUNT_SHOULD_BE_NUMERIC": {
+    "en": "Amount should be a numeric value.",
+    "ar": "يجب أن يكون مبلغ الكوبون قيمة رقمية."
+  },
+  "FIRST_NAME_MIN_LENGTH_3": {
+    "en": "First name should have a minimum of 3 characters.",
+    "ar": "يجب أن يكون مبلغ الكوبون قيمة رقمية."
+  },
+  "USERNAME_MIN_LENGTH_3": {
+    "en": "User name should have a minimum of 3 characters.",
+    "ar": "يجب أن يكون مبلغ الكوبون قيمة رقمية."
+  },
+  "FULLNAME_MIN_LENGTH_3": {
+    "en": "Full name should have a minimum of 3 characters.",
+    "ar": "يجب أن يكون مبلغ الكوبون قيمة رقمية."
+  },
+  "EMAIL_EMPTY": {
+    "en": "Please enter email.",
+    "ar": "يجب أن يكون مبلغ الكوبون قيمة رقمية."
+  },
+  "CURRENCY_FROM": {
+    "en": "Please provide currency from.",
+    "ar": ""
+  },
+  "CURRENCY_TO": {
+    "en": "Please provide currenct to.",
+    "ar": ""
+  },
+  "OLDPASSWORD_EMPTY": {
+    "en": "Please enter old password.",
+    "ar": "بطاقة الخدش بهذا الرمز موجودة بالفعل."
+  },
+  "NEWPASSWORD_EMPTY": {
+    "en": "Please enter new password.",
+    "ar": "بطاقة الخدش بهذا الرمز موجودة بالفعل."
+  },
+  "USERNAME_STATUS_FETCHED": {
+    "en": "Username status fetched successfully. ",
+    "ar": ""
+  },
+  "SOCIAL_ID_STATUS_FETCHED": {
+    "en": "Social id fetched successfully. ",
+    "ar": ""
+  },
+  "SIGNUP_MOBILE_VERIFY_NEW": {
+    "en": "OTP sent successfully to your mobile number.",
+    "al": ""
+  },
+  "MANUALLY_REGISTERED": {
+    "en": "You have registered manually.",
+    "al": ""
+  },
+  "INVALID_TOKEN": {
+    "en": "Invalid Token.",
+    "al": ""
+  },
+  "EMAIL_DOES_NOT_MATCH": {
+    "en": "Email does not match with your social account.",
+    "al": ""
+  },
+  "SOCIAL_ID_DOES_NOT_MATCH": {
+    "en": "Social id does not match.",
+    "al": ""
+  },
+  "CATEGORY_TYPE_EMPTY": {
+    "en": "Please select category classification.",
+    "al": ""
+  },
+  "STATUS_EMPTY": {
+    "en": "Status is required.",
+    "al": ""
+  },
+  "ID_EMPTY": {
+    "en": "ID is required.",
+    "al": ""
+  },
+  "SUB_CATEGORY_ALREADY_EXIST": {
+    "en": "This subcategory already exists.",
+    "ar": ""
+  },
+  "SUB_CATEGORY_ADDED": {
+    "en": "Subcategory has been added successfully into the system.",
+    "ar": ""
+  },
+  "SUB_CATEGORY_UPDATED": {
+    "en": "Subcategory updated successfully.",
+    "ar": ""
+  },
+  "SUB_CATEGORY_STATUS_UPDATED": {
+    "en": "Subcategory status updated successfully.",
+    "ar": ""
+  },
+  "CATEGORY_EMPTY": {
+    "en": "Please select category.",
+    "ar": ""
+  },
+  "SUB_CATEGORY_EMPTY": {
+    "en": "Please select sub category.",
+    "ar": ""
+  },
+  "IMAGES_EMPTY": {
+    "en": "Please select images.",
+    "ar": ""
+  },
+  "IMAGES_TOO_MANY": {
+    "en": "Please select images less than or equal to 3.",
+    "ar": ""
+  },
+  "UNIT_EMPTY": {
+    "en": "Please enter unit.",
+    "ar": ""
+  },
+  "FIRST_NAME_EMPTY": {
+    "en": "Please enter first name.",
+    "ar": ""
+  },
+  "LAST_NAME_EMPTY": {
+    "en": "Please enter last name.",
+    "ar": ""
+  },
+  "COUNTRY_CODE_EMPTY": {
+    "en": "Please enter country code.",
+    "ar": ""
+  },
+  "MOBILE_EMPTY": {
+    "en": "Please enter mobile.",
+    "ar": ""
+  },
+  "COUNTRY_EMPTY": {
+    "en": "Please enter country.",
+    "ar": ""
+  },
+  "ZIP_CODE_EMPTY": {
+    "en": "Please enter zip code.",
+    "ar": ""
+  },
+  "ADMIN_COMMISSION_EMPTY": {
+    "en": "Please enter commission.",
+    "ar": ""
+  },
+  "ADDRESS_EMPTY": {
+    "en": "Please enter address.",
+    "ar": ""
+  },
+  "MOBILE_EMAIL_VERIFIED": {
+    "en": "Mobile and email verified successfully",
+    "ar": ""
+  },
+  "OTP_SENT_EMAIL_MOBILE": {
+    "en": "OTP sent successfully to your mobile number and email.",
+    "ar": ""
+  },
+  "OTP_SENT_EMAIL": {
+    "en": "OTP sent successfully to your email.",
+    "ar": ""
+  },
+  "OTP_SENT_MOBILE": {
+    "en": "OTP sent successfully to your mobile.",
+    "ar": ""
+  },
+  "TYPE_NOT_EXITS": {
+    "en": "Type not exist.",
+    "ar": ""
+  },
+  "USER_EMAIL_NOT_FOUND": {
+    "en": "User email not found.",
+    "ar": ""
+  },
+  "USER_MOBILE_NOT_FOUND": {
+    "en": "User mobile number not found.",
+    "ar": ""
+  },
+  "MOBILE_NOT_FOUND": {
+    "en": "Mobile not found.",
+    "ar": ""
+  },
+  "USER_INVALID_LOGIN": {
+    "en": "User invalid login.",
+    "ar": ""
+  },
+  "ADDRESS_DELETED": {
+    "en": "Address deleted successfully.",
+    "ar": ""
+  },
+  "INVALID_OTP": {
+    "en": "Invalid OTP.",
+    "ar": ""
+  },
+  "OTP_VERIFIED_SUCCESS": {
+    "en": "OTP verified successfully.",
+    "ar": ""
+  },
+  "PASSWORD_MATCH_ERROR": {
+    "en": "Old password and confirm password can not be same.",
+    "ar": ""
+  },
+  "OTP_SEND_MOBILE_EMAIL": {
+    "en": "OTP send successfully to your mobile and email.",
+    "ar": ""
+  },
+  "EMAIL_USER_NOT_FOUND": {
+    "en": "Email not found. Please enter a valid email.",
+    "ar": ""
+  },
+  "RATING_SUCCESSFULLY": {
+    "en": "Rating successfully.",
+    "ar": ""
+  },
+  "ACCOUNT_DELETED": {
+    "en": "Account deleted successfully.",
+    "ar": ""
+  },
+  "ADDRESS_ADD_SUCCESS": {
+    "en": "Address added successfully.",
+    "ar": ""
+  },
+  "ADDRESS_UPDATE_SUCCESS": {
+    "en": "Address update successfully.",
+    "ar": ""
+  },
+  "ADDRESS_DELETED_SUCCESS": {
+    "en": "Address deleted successfully.",
+    "ar": ""
+  },
+  "ADDRESS_NOT_FOUND": {
+    "en": "Address not found.",
+    "ar": ""
+  },
+  "DEFAULT_ADDRESS_CHANGE_SUCCESS": {
+    "en": "Default address changed successfully.",
+    "ar": ""
+  },
+  "DEFAULT_ADDRESS_EMPTY": {
+    "en": "Default address empty.",
+    "ar": ""
+  },
+  "SAMPLE_FILE_DOWNLOAD_SUCCESS": {
+    "en": "Sample file downloaded successfully.",
+    "ar": ""
+  },
+  "INVALID_MOBILE_EMAIL_OTP": {
+    "en": "Invalid mobile and email OTP.",
+    "ar": ""
+  },
+  "PRODUCT_PRICES_UPDATED_SUCCESSFULLY": {
+    "en": "Product prices updated successfully.",
+    "ar": ""
+  },
+  "CSV_FILE_REMOVED": {
+    "en": "CSV file removed successfully.",
+    "ar": ""
+  },
+  "CUSTOMER_DISCOUNT_ADD_SUCCESS": {
+    "en": "Customer discount added successfully.",
+    "ar": ""
+  },
+  "CUSTOMER_DISCOUNT_DELETE_SUCCESS": {
+    "en": "Customer discount deleted successfully.",
+    "ar": ""
+  },
+  "CATEGORY_ID_EMPTY": {
+    "en": "Please send category ID.",
+    "ar": ""
+  },
+  "PRODUCT_ID_EMPTY": {
+    "en": "Please send product ID.",
+    "ar": ""
+  },
+  "FAVORITE_SUCCESS": {
+    "en": "Product added to favorites.",
+    "ar": ""
+  },
+  "UNFAVORITE_SUCCESS": {
+    "en": "Product removed from favorites.",
+    "ar": ""
+  },
+  "USER_ADD_SUCCESS": {
+    "en": "User account created successfully.",
+    "ar": ""
+  },
+  "CATEGORY_SEQUENCE_UPDATED": {
+    "en": "Category sequence updated successfully.",
+    "ar": ""
+  },
+  "BANNER_SEQUENCE_UPDATED": {
+    "en": "Banner sequence updated successfully.",
+    "ar": ""
+  },
+  "FAQ_SEQUENCE_UPDATED": {
+    "en": "FAQ sequence updated successfully.",
+    "ar": ""
+  },
+  "CSV_FILE_UPLOAD_SUCCESS": {
+    "en": "CSV file uploaded successfully.",
+    "ar": ""
+  },
+  "OLD_PASSWORD_NOT_CREATED": {
+    "en": "Your password has not been created in the system. Please use the 'Forgot Password' option to create it.",
+    "ar": ""
+  },
+  "CURRENCY_ERROR_IN_CART": {
+    "en": "Only same currency products can be added to the cart.",
+    "ar": ""
+  },
+  "PRODUCT_ALREADY_IN_CART": {
+    "en": "This product has already been added to the cart.",
+    "ar": ""
+  },
+  "PRODUCT_ADD_TO_CART_SUCCESS": {
+    "en": "Product added to the cart successfully.",
+    "ar": ""
+  },
+  "QUANTITY_EMPTY": {
+    "en": "Please enter quantity.",
+    "ar": ""
+  },
+  "POST_CODE_EMPTY": {
+    "en": "Please send postcode.",
+    "ar": ""
+  },
+  "PRICE_EMPTY": {
+    "en": "Please send price.",
+    "ar": ""
+  },
+  "CURRENCY_EMPTY": {
+    "en": "Please send currency.",
+    "ar": ""
+  },
+  "START_DATE_EMPTY": {
+    "en": "Please send start date.",
+    "ar": ""
+  },
+  "END_DATE_EMPTY": {
+    "en": "Please send end date.",
+    "ar": ""
+  },
+  "START_TIME_EMPTY": {
+    "en": "Please send start time.",
+    "ar": ""
+  },
+  "END_TIME_EMPTY": {
+    "en": "Please send end time.",
+    "ar": ""
+  },
+  "DISCOUNT_EMPTY": {
+    "en": "Please send discount.",
+    "ar": ""
+  },
+  "VAT_EMPTY": {
+    "en": "Please send VAT.",
+    "ar": ""
+  },
+  "TOTAL_AMOUNT_EMPTY": {
+    "en": "Please send total amount.",
+    "ar": ""
+  },
+  "PRODUCT_HIRED_SUCCESS": {
+    "en": "Product hired successfully.",
+    "ar": ""
+  },
+  "EMAIL_TEMPLATE_UPDATE_SUCCESSFULLY": {
+    "en": "Email Template status updated successfully.",
+    "ar": ""
+  },
+  "TESTIMONIAL_CREATED": {
+    "en": "Testimonial created successfully.",
+    "ar": ""
+  },
+  "TESTIMONIAL_UPDATE": {
+    "en": "Testimonial updated successfully.",
+    "ar": ""
+  },
+  "TESTIMONIAL_DELETE": {
+    "en": "Testimonial delete successfully.",
+    "ar": ""
+  },
+  "TESTIMONIAL_STATUS_UPDATE": {
+    "en": "Testimonial status has been updated successfully.",
+    "ar": ""
+  },
+  "TESTIMONIAL_SEQUENCE_UPDATED": {
+    "en": "Testimonial sequence has been updated successfully.",
+    "ar": ""
+  },
+  "SUBSCRIPTION_DURATION": {
+    "en": "Invalid duration. Allowed values: 1 (monthly) or 12 (yearly).",
+    "ar": ""
+  },
+  "SUBSCRIPTION_TYPE": {
+    "en": "Invalid type. Allowed values: monthly or yearly",
+    "ar": ""
+  },
+  "SUBSCRIPTION_NOT_FOUND": {
+    "en": "Subscription not found",
+    "ar": ""
+  },
+  "SUBSCRIPTION_CREATED": {
+    "en": "Subscription created successfully.",
+    "ar": ""
+  },
+  "SUBSCRIPTION_UPDATED": {
+    "en": "Subscription updated successfully.",
+    "ar": ""
+  },
+  "SUBSCRIPTION_ALREADY_EXIST": {
+    "en": "Subscription already exist with this name.",
+    "ar": ""
+  },
+  "LIMIT_REACHED": {
+    "en": "Description limit reached.",
+    "ar": ""
+  },
+  "NAME_EMPTY": {
+    "en": "Name is required.",
+    "ar": ""
+  },
+  "NAME_LIMIT_REACHED": {
+    "en": "Name must not exceed 100 characters.",
+    "ar": ""
+  },
+  "DESCRIPTION_EMPTY": {
+    "en": "Description is required.",
+    "ar": ""
+  },
+  "DURATION_EMPTY": {
+    "en": "Duration is required.",
+    "ar": ""
+  },
+  "PRICE_EMPTY": {
+    "en": "Price is required.",
+    "ar": ""
+  },
+  "MONTHS_EMPTY": {
+    "en": "Number of months is required.",
+    "ar": ""
+  }
+}

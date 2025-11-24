@@ -1,0 +1,28 @@
+<html>
+    <head>
+        <style>
+        </style>
+    </head>
+    <body style="margin: 50px;">
+        <table style="width: 100%;">
+            <tbody>
+                <tr>
+                    <td><h3 style="font-family:'Open Sans', Arial, Helvetica, sans-serif;font-size: 24px;color: #282828;text-decoration: none;">ALPay</h3></td>
+                    <td style="text-align: end;"><h3 style="font-family:'Open Sans', Arial, Helvetica, sans-serif;font-size: 22px;color: #282828;text-decoration: none;">Invoice (#<%= invoiceData?.transactionId %>)</h3></td>
+                </tr>
+            </tbody>
+        </table>
+        <br/>
+        <div style="text-align: right;">
+            <span style="font-family:'Open Sans', Arial, Helvetica, sans-serif;font-size: 14px;font-weight: bold; color: #282828;text-decoration: none"><%= invoiceData?.name%></span><br/>
+            <span style="font-family:'Open Sans', Arial, Helvetica, sans-serif;font-size: 14px;color: #282828;text-decoration: none"><%= invoiceData?.address %></span><br/>
+            <span style="font-family:'Open Sans', Arial, Helvetica, sans-serif;font-size: 14px;color: #282828;text-decoration: none"><%= "+" + invoiceData?.countryCode + " " + invoiceData?.mobile %></span><br/>
+            <span style="font-family:'Open Sans', Arial, Helvetica, sans-serif;font-size: 14px;color: #282828;text-decoration: none"><%= invoiceData?.email %></span>
+        </div><br/><br/><hr/><br/>
+        <div>
+            <span style="text-align: left;font-family:'Open Sans', Arial, Helvetica, sans-serif;font-size: 16px;color: #282828;font-weight: bold;text-decoration: none"> Description : <%= invoiceData?.description %></span><br/>
+            <span style="text-align: left;font-family:'Open Sans', Arial, Helvetica, sans-serif;font-size: 16px;color: #282828;font-weight: bold;text-decoration: none"> Amount : LEK <%= invoiceData?.amount %></span><br/><br/>
+            <img style="text-align: end;" src="<%= invoiceData?.urlQR %>"/>
+        </div>
+    </body>
+</html>
