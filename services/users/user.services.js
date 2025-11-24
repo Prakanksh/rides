@@ -6,6 +6,9 @@ const { v4: uuidv4 } = require('uuid')
 const constant = require('../../helpers/constant')
 const axios = require('axios')
 const bcrypt = require('bcryptjs')
+const { verifyMobileOTP, verifyEmailOTP } = require("../../helpers/verifyOtp");
+
+
 const {
   generateOTP,
   getAdminSetting,
@@ -132,6 +135,8 @@ module.exports = {
   },
   verifyOTP: async (req, res) => {
     try {
+      console.log("📌 STEP — verifyOTP Incoming Body:", req.body);
+
       const {
         otpMobile,
         otpEmail,
@@ -140,80 +145,119 @@ module.exports = {
         deviceId,
         deviceType,
         deviceToken
-      } = req.body
-      const OTP_EXPIRATION_SECONDS = process.env.OTP_EXPIRATION_SECONDS
-      const mobileOtp = await Otp.findOne({ _id: mobileOtpId })
-      const emailOtp = await Otp.findOne({ _id: emailOtpId, otp: otpEmail })
+      } = req.body;
 
+      const OTP_EXPIRATION_SECONDS = parseInt(process.env.OTP_EXPIRATION_SECONDS || "120", 10);
+
+      // fetch stored OTP entries
+      const mobileOtpRecord = mobileOtpId ? await Otp.findOne({ _id: mobileOtpId }) : null;
+      const emailOtpRecord = emailOtpId ? await Otp.findOne({ _id: emailOtpId }) : null;
+
+      console.log("📌 OTP Records:", { mobileOtpRecord, emailOtpRecord });
+
+      // Basic existence check
+      if (!mobileOtpRecord || !emailOtpRecord) {
+        // keep message consistent with your API
+        return res.json(responseData("INVALID_MOBILE_EMAIL_OTP", {}, req, false));
+      }
+
+      // Validate mobile OTP using helper - helper should return null on success, or error string on failure
       const mobileOtpResult = await verifyMobileOTP(
         otpMobile,
         OTP_EXPIRATION_SECONDS,
         mobileOtpId
-      )
+      );
+
+      // Validate email OTP using helper - helper should return null on success, or error string on failure
       const emailOtpResult = await verifyEmailOTP(
         otpEmail,
         OTP_EXPIRATION_SECONDS,
         emailOtpId
-      )
+      );
+
+      console.log("📌 Validation Results:", { mobileOtpResult, emailOtpResult });
+
+      // If both failed, return combined message
       if (mobileOtpResult && emailOtpResult) {
-        return res.json(responseData("INVALID_MOBILE_EMAIL_OTP", {}, req, false))
+        return res.json(responseData("INVALID_MOBILE_EMAIL_OTP", {}, req, false));
       }
+
+      // If mobile failed
       if (mobileOtpResult) {
-        return res.json(responseData(mobileOtpResult, {}, req, false))
+        return res.json(responseData(mobileOtpResult, {}, req, false));
       }
+
+      // If email failed
       if (emailOtpResult) {
-        return res.json(responseData(emailOtpResult, {}, req, false))
+        return res.json(responseData(emailOtpResult, {}, req, false));
       }
+
+      // At this point both OTPs are valid — create user from TempUser
       const tempUser = await TempUser.findOne({
-        mobile: mobileOtp?.mobile,
-        email: emailOtp?.email
-      })
-      if (isEmpty(tempUser)) {
-        return res.json(
-          responseData('ERROR_OCCUR', { tempUser: false }, req, false)
-        )
+        mobile: mobileOtpRecord.mobile,
+        email: emailOtpRecord.email
+      });
+
+      if (!tempUser) {
+        console.log("📌 TEMP USER NOT FOUND for:", {
+          mobile: mobileOtpRecord.mobile,
+          email: emailOtpRecord.email
+        });
+        return res.json(responseData("TEMP_USER_NOT_FOUND", {}, req, false));
       }
+
+      // Build user object
       const createObj = {
-        fullName: tempUser?.fullName,
-        firstName: tempUser?.firstName,
-        lastName: tempUser?.lastName,
-        mobile: tempUser?.mobile,
-        password: tempUser?.password,
-        email: tempUser?.email,
-        countryCode: tempUser?.countryCode,
+        fullName: tempUser.fullName,
+        firstName: tempUser.firstName,
+        lastName: tempUser.lastName,
+        mobile: tempUser.mobile,
+        password: tempUser.password,
+        email: tempUser.email,
+        countryCode: tempUser.countryCode,
         isMobileVerified: true,
         isEmailVerified: true,
-        role: 'user',
-        profilePic: null
-      }
-      const user = await User.create(createObj)
-      await TempUser.deleteOne({ _id: tempUser?._id })
-      const userInfo = user?.toJSON()
-      const token = generateAuthToken(userInfo)
+        role: "user",
+        profilePic: tempUser.profilePic || null
+      };
+
+      const user = await User.create(createObj);
+      const userInfo = user.toJSON();
+      const token = generateAuthToken(userInfo);
+
+      // Update device info (if any)
       await User.findOneAndUpdate(
         { _id: userInfo._id },
         { deviceId, deviceType, deviceToken },
         { new: true }
-      )
-      await Otp.findOneAndRemove({ _id: mobileOtpId, otp: otpMobile })
-      await Otp.findOneAndRemove({ _id: emailOtpId, otp: otpEmail })
-      let dataBody = {
-        email: user?.email.toLowerCase(),
-        FIRSTNAME: user?.firstName
+      );
+
+      // cleanup
+      await TempUser.deleteOne({ _id: tempUser._id }).catch(()=>{});
+      await Otp.deleteOne({ _id: mobileOtpId }).catch(()=>{});
+      await Otp.deleteOne({ _id: emailOtpId }).catch(()=>{});
+
+      // send welcome email asynchronously (don't block response)
+      try {
+        helper.sendEmail("welcome_email", {
+          email: user.email.toLowerCase(),
+          FIRSTNAME: user.firstName
+        });
+      } catch (e) {
+        console.log("Warning: welcome email send failed:", e?.message || e);
       }
-      helper.sendEmail("welcome_email", dataBody);
+
+      console.log("📌 OTP verification successful for user:", userInfo._id);
+
       return res.json(
-        responseData(
-          'MOBILE_EMAIL_VERIFIED',
-          { ...userInfo, ...token },
-          req,
-          true
-        )
-      )
+        responseData("MOBILE_EMAIL_VERIFIED", { ...userInfo, ...token }, req, true)
+      );
     } catch (error) {
-      return res.json(responseData('ERROR_OCCUR', error.message, req, false))
+      console.error("verifyOTP ERROR:", error);
+      return res.json(responseData("ERROR_OCCUR", error.message || error, req, false));
     }
   },
+
   userLogin: async (req, res) => {
     try {
       let {
@@ -859,59 +903,6 @@ module.exports = {
       return res.json(responseData('ERROR_OCCUR', error.message, req, false))
     }
   },
-  verifyEmailOtp: async (req, res) => {
-    try {
-      const { emailOtpId, otp } = req.body
-
-      const OTP_EXPIRATION_SECONDS = process.env.OTP_EXPIRATION_SECONDS || 60
-
-      const checkEmailOtp = await EmailOtp.findOne({ _id: emailOtpId, otp })
-
-      if (isEmpty(checkEmailOtp)) {
-        return res.json(responseData('OTP_NOT_VERIFIED', {}, req, false))
-      }
-
-      const currentTime = moment()
-      const timeDifferenceEmail = currentTime.diff(
-        checkEmailOtp?.createdAt,
-        'seconds'
-      )
-
-      if (timeDifferenceEmail > parseInt(OTP_EXPIRATION_SECONDS)) {
-        return res.json(responseData('MOBILE_OTP_EXPIRED', {}, req, false))
-      }
-
-      let isUserExist = await User.findOne({
-        email: checkEmailOtp?.email
-      })
-
-      if (!isEmpty(isUserExist)) {
-        await EmailOtp.findOneAndRemove({
-          _id: emailOtpId
-        })
-        isUserExist = isUserExist.toJSON()
-
-        const updatedInfo = {
-          isEmailVerified: 1
-        }
-
-        isUserExist = await User.findOneAndUpdate(
-          { _id: isUserExist._id },
-          updatedInfo,
-          { new: true }
-        )
-        isUserExist = isUserExist.toJSON()
-
-        return res.json(
-          responseData('EMAIL_VERIFIED', { ...isUserExist }, req, true)
-        )
-      }
-      return res.json(responseData('ERROR_OCCUR', {}, req, false))
-    } catch (error) {
-      console.log('error', error)
-      return res.json(responseData('ERROR_OCCUR', error.message, req, false))
-    }
-  },
   accountDelete: async (req, res) => {
     try {
       const { _id } = req.user
@@ -1376,79 +1367,6 @@ const getAppleResponse =  async idToken => {
     console.error('Error verifying Apple ID token:', error);
     return false
   }
-}
-
-const verifyMobileOTP = async (
-  otpMobile,
-  OTP_EXPIRATION_SECONDS,
-  mobileOtpId
-) => {
-  const checkMobileOtp = await Otp.findOne({
-    _id: mobileOtpId
-  })
-
-  if (isEmpty(checkMobileOtp)) {
-    return 'INVALID_MOBILE_OTP'
-  }
-  let checkVerified = await TempUser.findOne(
-    {
-      countryCode: checkMobileOtp?.countryCode,
-      mobile: checkMobileOtp?.mobile
-    }
-  )
-  if (!checkVerified?.isMobileVerified) {
-  
-    const responseOTP = await helper.verifyOTPTwilio(checkMobileOtp?.countryCode, checkMobileOtp?.mobile, otpMobile)
-    if (responseOTP === 'pending') {
-      // return res.json(responseData('INVALID_MOBILE_OTP', {}, req, false))
-      return 'INVALID_MOBILE_OTP'
-    }
-    if (!responseOTP) {
-      // return res.json(responseData('MOBILE_OTP_EXPIRED', {}, req, false))
-      return 'MOBILE_OTP_EXPIRED'
-    }
-  
-    await TempUser.findOneAndUpdate(
-      {
-        countryCode: checkMobileOtp?.countryCode,
-        mobile: checkMobileOtp?.mobile
-      },
-      { isMobileVerified: true },
-      { new: true }
-    )
-    // await Otp.findOneAndRemove({ _id: mobileOtpId, otp: otpMobile })
-  
-    return null
-  }
-}
-const verifyEmailOTP = async (otpEmail, OTP_EXPIRATION_SECONDS, emailOtpId) => {
-  const checkEmailOtp = await Otp.findOne({
-    _id: emailOtpId,
-    otp: otpEmail
-  })
-
-  if (isEmpty(checkEmailOtp)) {
-    return 'INVALID_EMAIL_OTP'
-  }
-
-  const currentTime = moment()
-  const emailOtpCreationTime = checkEmailOtp?.createdAt
-  const timeDifferenceMobile = currentTime.diff(emailOtpCreationTime, 'seconds')
-
-  if (timeDifferenceMobile > OTP_EXPIRATION_SECONDS) {
-    await Otp.findOneAndRemove({ _id: emailOtpId, otp: otpEmail })
-    return 'EMAIL_OTP_EXPIRED'
-  }
-  await TempUser.findOneAndUpdate(
-    {
-      email: checkEmailOtp?.email
-    },
-    { isEmailVerified: true },
-    { new: true }
-  )
-  // await Otp.findOneAndRemove({ _id: emailOtpId, otp: otpEmail })
-
-  return null
 }
 const login = async (
   req,

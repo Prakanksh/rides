@@ -27,9 +27,10 @@ const {S3Client, DeleteObjectCommand} = require('@aws-sdk/client-s3')
 const TempUser = require('../models/tempUser.model')
 const Subscription = require('../models/subscription.model')
 
-const accountSid = process.env.TWILIO_ACCOUNT_SID
-const authToken = process.env.TWILIO_AUTH_TOKEN
-// const client = require('twilio')(accountSid, authToken);
+const accountSid = process.env.TWILIO_ACCOUNT_SID;
+const authToken = process.env.TWILIO_AUTH_TOKEN;
+const client = require('twilio')(accountSid, authToken);
+
 
 // const s3Client = new S3Client({
 //   region: process.env.AWS_REGION,

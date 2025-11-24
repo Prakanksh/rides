@@ -45,6 +45,9 @@ const adminSubscriptionRouter = require('./routes/admins/subscription.route')
 const driverRoutes = require('./routes/driver/driver.route')
 const driverAuthRoutes = require('./routes/driver/auth.route')
 
+// ===== RIDE ROUTES (NEW) =====
+const rideRoutes = require('./routes/ride/ride.route')
+
 // ====================================================
 // 🟢 MIDDLEWARES MUST COME BEFORE ROUTES
 // ====================================================
@@ -67,11 +70,17 @@ app.use(express.static('public'))
 app.use(express.static(path.join(__dirname, 'public')))
 
 // ====================================================
-// 🟢 DRIVER ROUTES — NOW AFTER express.json()
+// 🟢 DRIVER ROUTES
 // ====================================================
 
-app.use('/v1/driver', driverRoutes)           // driver register, profile
-app.use('/v1/driver/auth', driverAuthRoutes)  // otp login
+app.use('/v1/driver', driverRoutes)
+app.use('/v1/driver/auth', driverAuthRoutes)
+
+// ====================================================
+// 🟢 RIDE ROUTES (NEW)
+// ====================================================
+
+app.use('/v1/ride', rideRoutes)
 
 // Health route
 app.get('/', (req, res) => {
