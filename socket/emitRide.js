@@ -1,16 +1,28 @@
+let ioInstance = null;
+const { getDriverSocket } = require("./driverSocketMap");
+
+// ⭐ 1) Initialize IO instance once
+function initSocketIO(io) {
+  ioInstance = io;
+}
+
+// ⭐ 2) Send ride to driver
 function sendRideToDriver(driverId, rideData) {
-  if (!global.io) return;
-
-  const socketId = getSocketIdByDriver(driverId);
-
-  if (!socketId) {
-    console.log("❌ Driver not connected:", driverId);
+  if (!ioInstance) {
+    console.log("❌ ERROR: ioInstance not initialized!");
     return;
   }
 
-  console.log("🚕 Sending ride request to driver:", driverId);
+  const driverSocket = getDriverSocket(driverId);
 
-  global.io.to(socketId).emit("ride:incoming", rideData);
+  if (!driverSocket) {
+    console.log(`⚠️ Driver ${driverId} is offline. Cannot send ride.`);
+    return;
+  }
+
+  console.log(`🚕 Sending ride to driver ${driverId} on socket ${driverSocket}`);
+
+  ioInstance.to(driverSocket).emit("ride:new", rideData);
 }
 
 module.exports = {

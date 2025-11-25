@@ -44,6 +44,8 @@ const userRoutes = require('./routes/users/user.route');
 const userStaticContentRoutes = require('./routes/users/staticcontent.route');
 const userSavedAddressRoutes = require('./routes/users/address.route');
 const userNotificationRoutes = require('./routes/users/notification.route');
+const userRideRoutes = require("./routes/users/ride.route");
+
 
 // Admin routes
 const adminEmailTemplateRouter = require('./routes/admins/emailTemplate.route');
@@ -66,6 +68,7 @@ const adminSubscriptionRouter = require('./routes/admins/subscription.route');
 // Driver routes
 const driverRoutes = require('./routes/driver/driver.route');
 const driverAuthRoutes = require('./routes/driver/auth.route');
+const driverOnlineRoutes = require('./routes/driver/online.route');
 
 // Ride routes
 const rideRoutes = require('./routes/ride/ride.route');
@@ -93,6 +96,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 // -------------------------
 app.use('/v1/driver', driverRoutes);
 app.use('/v1/driver/auth', driverAuthRoutes);
+app.use("/v1/driver", driverOnlineRoutes);
 
 // -------------------------
 // RIDE ROUTES
@@ -130,6 +134,7 @@ app.use('/v1/user', userRoutes);
 app.use('/v1/user/notification', userNotificationRoutes);
 app.use('/v1/user/staticcontent', userStaticContentRoutes);
 app.use('/v1/user/address', userSavedAddressRoutes);
+app.use("/v1/user/ride", userRideRoutes);
 
 // -------------------------
 // NOT FOUND HANDLER

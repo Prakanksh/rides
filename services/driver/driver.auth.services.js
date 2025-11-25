@@ -77,5 +77,5 @@ module.exports = {
       console.log('verifyOtpLogin err:', err);
       return res.json(responseData('ERROR_OCCUR', err.message, req, false));
     }
-  }
+  },
 };

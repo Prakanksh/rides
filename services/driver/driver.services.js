@@ -200,6 +200,38 @@ module.exports = {
       console.log('updateProfile error:', err);
       return res.json(responseData('SERVER_ERROR', err.message, req, false));
     }
-  }
+  },
+
+  updateLocation: async (req, res) => {
+    try {
+      const driverId = req.user?._id; // comes from verifyToken
+      const { lat, lng } = req.body;
+
+      if (!driverId) {
+        return res.json(responseData("NOT_AUTHORIZED", {}, req, false));
+      }
+
+      if (!lat || !lng) {
+        return res.json(responseData("LOCATION_REQUIRED", {}, req, false));
+      }
+
+      await Driver.findByIdAndUpdate(
+        driverId,
+        {
+          location: {
+            type: "Point",
+            coordinates: [lng, lat] // GeoJSON format: [lng, lat]
+          }
+        },
+        { new: true }
+      );
+
+      return res.json(responseData("LOCATION_UPDATED", {}, req, true));
+
+    } catch (err) {
+      console.log("updateLocation err:", err);
+      return res.json(responseData("ERROR_OCCUR", err.message, req, false));
+    }
+  },
 
 };

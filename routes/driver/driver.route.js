@@ -10,5 +10,7 @@ router.post('/register', driverController.register)
 
 // Update driver profile (allowed only when logged in)
 router.put('/update-profile', verifyToken, driverController.updateProfile)
+router.post("/update-location", verifyToken, driverController.updateLocation);
+
 
 module.exports = router

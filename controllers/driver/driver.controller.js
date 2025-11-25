@@ -18,5 +18,15 @@ module.exports = {
       const msg = err.message || 'SOMETHING_WENT_WRONG'
       return res.status(422).json(responseData(msg, {}, req, false))
     }
-  }
+  },
+
+  updateLocation: async (req, res) => {
+    try {
+      await driverService.updateLocation(req, res)
+    } catch (error) {
+      const msg = error.message || 'SOMETHING_WENT_WRONG'
+      return res.status(422).json(responseData(msg, {}, req, false))
+    }
+  },
+
 }
