@@ -69,9 +69,7 @@ const adminSubscriptionRouter = require('./routes/admins/subscription.route');
 const driverRoutes = require('./routes/driver/driver.route');
 const driverAuthRoutes = require('./routes/driver/auth.route');
 const driverOnlineRoutes = require('./routes/driver/online.route');
-
-// Ride routes
-const rideRoutes = require('./routes/ride/ride.route');
+const driverRideRoutes = require("./routes/driver/ride.route");
 
 // -------------------------
 // MIDDLEWARES
@@ -97,11 +95,8 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use('/v1/driver', driverRoutes);
 app.use('/v1/driver/auth', driverAuthRoutes);
 app.use("/v1/driver", driverOnlineRoutes);
+app.use("/v1/driver/ride", driverRideRoutes);
 
-// -------------------------
-// RIDE ROUTES
-// -------------------------
-app.use('/v1/ride', rideRoutes);
 
 // Health route
 app.get('/', (req, res) => {
