@@ -1,14 +1,12 @@
-const Ride = require("../../models/ride.model");
-const Driver = require("../../models/driver.model");
-const { responseData } = require("../../helpers/responseData");
+// services/ride/ride.service.js
 
+const Ride = require("../../models/ride.model");
+const { responseData } = require("../../helpers/responseData");
 const { calculateDistanceInKm } = require("../../helpers/distance");
 const { calculateFare } = require("../../helpers/fareConfig");
+const { findBestDriver } = require("../driver/assignDriver.service");
 
 module.exports = {
-  // ----------------------------------------
-  // CREATE RIDE
-  // ----------------------------------------
   createRide: async (req, res) => {
     try {
       const {
@@ -32,7 +30,6 @@ module.exports = {
         return res.json(responseData("VEHICLE_TYPE_REQUIRED", {}, req, false));
       }
 
-      // Extract Lats & Lngs
       const [pickupLat, pickupLng] = pickupLocation.coordinates;
       const [dropLat, dropLng] = dropLocation.coordinates;
 
@@ -42,12 +39,14 @@ module.exports = {
         dropLat,
         dropLng
       );
-
       const fareData = calculateFare(distanceKm);
-
+      const assignedDriver = await findBestDriver(
+        pickupLocation,
+        vehicleType
+      );
       const ride = await Ride.create({
         rider: riderId,
-        driver: null,
+        driver: assignedDriver?._id || null,
         pickupLocation,
         dropLocation,
         distance: Number(distanceKm.toFixed(2)),
@@ -55,60 +54,25 @@ module.exports = {
         finalFare: 0,
         vehicleType,
         paymentMethod: paymentMethod || "cash",
-        status: "requested",
+        status: "requested"
       });
 
       return res.json(
         responseData(
           "RIDE_CREATED",
-          { ride, fareBreakdown: fareData.breakdown },
+          {
+            ride,
+            assignedDriver,
+            fareBreakdown: fareData.breakdown
+          },
           req,
           true
         )
       );
 
     } catch (err) {
-      console.log("CreateRide Error:", err);
-      return res.json(responseData("SERVER_ERROR", {}, req, false));
-    }
-  },
-
-  // ----------------------------------------
-  // GET NEARBY DRIVERS
-  // ----------------------------------------
-  getNearbyDrivers: async (req, res) => {
-    try {
-      const { pickupLat, pickupLng } = req.query;
-
-      if (!pickupLat || !pickupLng) {
-        return res.json(responseData("COORDINATES_REQUIRED", {}, req, false));
-      }
-
-      const radiusKm = 5; // 5km radius
-      const radiusInMeters = radiusKm * 1000;
-
-      const drivers = await Driver.find({
-        isAvailable: true,
-        status: "active",
-        registrationStatus: "approved",
-        location: {
-          $near: {
-            $geometry: {
-              type: "Point",
-              coordinates: [parseFloat(pickupLng), parseFloat(pickupLat)]
-            },
-            $maxDistance: radiusInMeters
-          }
-        }
-      }).select("firstName lastName mobile location vehicleType");
-
-      return res.json(
-        responseData("NEARBY_DRIVERS", { drivers }, req, true)
-      );
-
-    } catch (err) {
-      console.log("NearbyDrivers Error:", err);
-      return res.json(responseData("SERVER_ERROR", {}, req, false));
+      console.error("Create Ride Error:", err);
+      return res.json(responseData(err.message || "SERVER_ERROR", {}, req, false));
     }
   }
 };

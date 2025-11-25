@@ -6,21 +6,19 @@ module.exports = {
     try {
       await rideService.createRide(req, res);
     } catch (err) {
-      console.log("CreateRide Controller Error:", err);
       return res.json(
-        responseData(err.message || "SERVER_ERROR", {}, req, false)
+        responseData(err.message || "SOMETHING_WENT_WRONG", {}, req, false)
       );
     }
   },
 
-  getNearbyDrivers: async (req, res) => {
+  nearbyDrivers: async (req, res) => {
     try {
-      await rideService.getNearbyDrivers(req, res);
+      await rideService.nearbyDrivers(req, res);
     } catch (err) {
-      console.log("Nearby Controller Error:", err);
       return res.json(
-        responseData(err.message || "SERVER_ERROR", {}, req, false)
+        responseData(err.message || "SOMETHING_WENT_WRONG", {}, req, false)
       );
     }
-  }
+  },
 };
