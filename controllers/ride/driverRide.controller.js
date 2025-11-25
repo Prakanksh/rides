@@ -1,44 +1,44 @@
 const { responseData } = require("../../helpers/responseData");
-const driverRideService = require("../../services/ride/driverRide.service");
+const rideService = require("../../services/ride/driverRide.service");
 
 module.exports = {
+  getAssignedRide: async (req, res) => {
+    try {
+      await rideService.getAssignedRide(req, res);
+    } catch (err) {
+      return res.json(responseData(err.message, {}, req, false));
+    }
+  },
+
   acceptRide: async (req, res) => {
     try {
-      await driverRideService.acceptRide(req, res);
+      await rideService.acceptRide(req, res);
     } catch (err) {
-      return res.json(
-        responseData(err.message || "SOMETHING_WENT_WRONG", {}, req, false)
-      );
+      return res.json(responseData(err.message, {}, req, false));
     }
   },
 
   arrivedAtPickup: async (req, res) => {
     try {
-      await driverRideService.arrivedAtPickup(req, res);
+      await rideService.arrivedAtPickup(req, res);
     } catch (err) {
-      return res.json(
-        responseData(err.message || "SOMETHING_WENT_WRONG", {}, req, false)
-      );
+      return res.json(responseData(err.message, {}, req, false));
     }
   },
 
   startRide: async (req, res) => {
     try {
-      await driverRideService.startRide(req, res);
+      await rideService.startRide(req, res);
     } catch (err) {
-      return res.json(
-        responseData(err.message || "SOMETHING_WENT_WRONG", {}, req, false)
-      );
+      return res.json(responseData(err.message, {}, req, false));
     }
   },
 
   completeRide: async (req, res) => {
     try {
-      await driverRideService.completeRide(req, res);
+      await rideService.completeRide(req, res);
     } catch (err) {
-      return res.json(
-        responseData(err.message || "SOMETHING_WENT_WRONG", {}, req, false)
-      );
+      return res.json(responseData(err.message, {}, req, false));
     }
   },
 };

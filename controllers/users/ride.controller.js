@@ -6,9 +6,8 @@ module.exports = {
     try {
       await rideService.createRide(req, res);
     } catch (err) {
-      return res.json(
-        responseData(err.message || "SOMETHING_WENT_WRONG", {}, req, false)
-      );
+      const msg = err.message || "SOMETHING_WENT_WRONG";
+      return res.json(responseData(msg, {}, req, false));
     }
   },
 
@@ -16,9 +15,32 @@ module.exports = {
     try {
       await rideService.nearbyDrivers(req, res);
     } catch (err) {
-      return res.json(
-        responseData(err.message || "SOMETHING_WENT_WRONG", {}, req, false)
-      );
+      const msg = err.message || "SOMETHING_WENT_WRONG";
+      return res.json(responseData(msg, {}, req, false));
     }
   },
+
+  getOneRide: async (req, res) => {
+    try {
+      await rideService.getOneRide(req, res);
+    } catch (err) {
+      return res.json(responseData(err.message, {}, req, false));
+    }
+  },
+
+  getActiveRide: async (req, res) => {
+    try {
+      await rideService.getActiveRide(req, res);
+    } catch (err) {
+      return res.json(responseData(err.message, {}, req, false));
+    }
+  },
+
+  cancelRide: async (req, res) => {
+    try {
+      await rideService.cancelRide(req, res);
+    } catch (err) {
+      return res.json(responseData(err.message, {}, req, false));
+    }
+  }
 };

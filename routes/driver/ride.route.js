@@ -1,19 +1,22 @@
-// driver/ride.route.js
 const express = require("express");
 const router = express.Router();
+
 const { verifyToken } = require("../../middlewares/verifyToken");
 const rideController = require("../../controllers/ride/driverRide.controller");
 
-// Driver accepts a ride
+// Fetch assigned ride
+router.get("/assigned", verifyToken, rideController.getAssignedRide);
+
+// Accept ride
 router.post("/accept", verifyToken, rideController.acceptRide);
 
-// Driver marks ARRIVED
+// Driver arrived
 router.post("/arrived", verifyToken, rideController.arrivedAtPickup);
 
-// Driver starts ride (OTP later)
+// Start ride
 router.post("/start", verifyToken, rideController.startRide);
 
-// Driver completes ride
+// Complete ride
 router.post("/complete", verifyToken, rideController.completeRide);
 
 module.exports = router;
