@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>User Socket Test</title>
+</head>
+<body>
+<h2>User Socket Test</h2>
+
+User ID: <input id="userId" value="USER_ID_HERE" />  
+<button onclick="connectUser()">Connect User</button>
+<br/><br/>
+
+Ride ID: <input id="rideId" />
+
+<pre id="log"></pre>
+
+<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+<script>
+let socket;
+const logBox = document.getElementById("log");
+
+function log(msg) {
+  logBox.textContent += msg + "\n";
+}
+
+function connectUser() {
+  const userId = document.getElementById("userId").value;
+  socket = io("http://localhost:5678");
+
+  socket.on("connect", () => log("User connected: " + socket.id));
+
+  socket.emit("user:connect", userId);
+
+  // NEW RIDE ACCEPTED
+  socket.on("user:rideAccepted", (data) => {
+    log("🎉 Ride Accepted:");
+    log(JSON.stringify(data, null, 2));
+    document.getElementById("rideId").value = data.ride._id;
+  });
+
+  // DRIVER ARRIVED
+  socket.on("user:driverArrived", (data) => {
+    log("📍 Driver Arrived:");
+    log(JSON.stringify(data, null, 2));
+    alert("Driver arrived! OTP = " + data.otp);
+  });
+
+  // RIDE STARTED
+  socket.on("user:rideStarted", (data) => {
+    log("🚗 Ride Started:");
+    log(JSON.stringify(data, null, 2));
+  });
+
+  // LIVE DRIVER LOCATION
+  socket.on("driver:location", (loc) => {
+    log("📍 Driver location: " + JSON.stringify(loc));
+  });
+
+  // RIDE COMPLETED
+  socket.on("user:rideCompleted", (data) => {
+    log("🏁 Ride Completed:");
+    log(JSON.stringify(data, null, 2));
+  });
+}
+</script>
+</body>
+</html>

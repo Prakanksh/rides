@@ -20,10 +20,6 @@ const io = new Server(server, {
   }
 });
 
-// -------------------------
-// Initialize Socket Helper
-// (This ALSO attaches all socket.on events internally)
-// -------------------------
 const { initSocketIO } = require("./socket/emitRide");
 initSocketIO(io);
 

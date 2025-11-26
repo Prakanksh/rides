@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Driver Socket Test</title>
+</head>
+<body>
+<h2>Driver Socket Test</h2>
+
+Driver ID: <input id="driverId" value="DRIVER_ID_HERE" />  
+<button onclick="connectDriver()">Connect Driver</button>
+<br/><br/>
+
+<button onclick="goOnline()">Go Online</button>
+<br/><br/>
+
+<button onclick="sendLocation()">Send Random Location</button>
+<br/><br/>
+
+Ride ID: <input id="rideId" />
+<br/><br/>
+
+<button onclick="acceptRide()">Accept Ride</button>
+<button onclick="arrived()">Arrived</button>
+<button onclick="startRide()">Start Ride (Requires OTP)</button>
+<input id="otpInput" placeholder="Enter OTP" />
+<br/><br/>
+
+<button onclick="completeRide()">Complete Ride</button>
+
+<pre id="log"></pre>
+
+<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+<script>
+let socket;
+let logBox = document.getElementById("log");
+
+function log(msg) {
+  logBox.textContent += msg + "\n";
+}
+
+function connectDriver() {
+  const driverId = document.getElementById("driverId").value;
+  socket = io("http://localhost:5678");
+
+  socket.on("connect", () => log("Socket connected: " + socket.id));
+
+  socket.emit("driver:online", driverId);
+  log("Sent driver:online");
+
+  // Receive new ride request
+  socket.on("ride:new", (ride) => {
+    log("🚕 NEW RIDE RECEIVED:");
+    log(JSON.stringify(ride, null, 2));
+    document.getElementById("rideId").value = ride._id;
+  });
+
+  // responses
+  socket.on("ride:accept:response", (d) => log("ACCEPT RESPONSE: " + JSON.stringify(d)));
+  socket.on("ride:arrived:response", (d) => log("ARRIVED RESPONSE: " + JSON.stringify(d)));
+  socket.on("ride:start:response", (d) => log("START RESPONSE: " + JSON.stringify(d)));
+  socket.on("ride:complete:response", (d) => log("COMPLETE RESPONSE: " + JSON.stringify(d)));
+}
+
+function goOnline() {
+  const driverId = document.getElementById("driverId").value;
+  socket.emit("driver:online", driverId);
+}
+
+function sendLocation() {
+  const driverId = document.getElementById("driverId").value;
+  const lat = 12.97 + (Math.random() / 100);
+  const lng = 77.59 + (Math.random() / 100);
+  socket.emit("driver:location", { driverId, lat, lng });
+  log("📍 Sent location: " + lat + "," + lng);
+}
+
+function acceptRide() {
+  const driverId = document.getElementById("driverId").value;
+  const rideId = document.getElementById("rideId").value;
+  socket.emit("ride:accept", { rideId, driverId });
+}
+
+function arrived() {
+  const driverId = document.getElementById("driverId").value;
+  const rideId = document.getElementById("rideId").value;
+  socket.emit("ride:arrived", { rideId, driverId });
+}
+
+function startRide() {
+  const driverId = document.getElementById("driverId").value;
+  const rideId = document.getElementById("rideId").value;
+  const otp = document.getElementById("otpInput").value;
+  socket.emit("ride:start", { rideId, driverId, otp });
+}
+
+function completeRide() {
+  const driverId = document.getElementById("driverId").value;
+  const rideId = document.getElementById("rideId").value;
+  socket.emit("ride:complete", { rideId, driverId });
+}
+</script>
+</body>
+</html>
