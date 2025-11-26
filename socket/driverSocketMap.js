@@ -1,6 +1,3 @@
-// This file keeps track of connected drivers
-// Key = driverId , Value = socket.id
-
 const driverSocketMap = new Map();
 
 module.exports = {
@@ -17,6 +14,10 @@ module.exports = {
   },
 
   getSocketId(driverId) {
+    return driverSocketMap.get(driverId);
+  },
+
+  getDriverSocket(driverId) {
     return driverSocketMap.get(driverId);
   }
 };
