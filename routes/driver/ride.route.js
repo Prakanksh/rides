@@ -1,4 +1,3 @@
-// routes/driver/ride.route.js
 const express = require("express");
 const router = express.Router();
 
@@ -10,5 +9,6 @@ router.post("/accept", verifyToken, rideController.acceptRide);
 router.post("/arrived", verifyToken, rideController.arrivedAtPickup);
 router.post("/start", verifyToken, rideController.startRide);
 router.post("/complete", verifyToken, rideController.completeRide);
+router.post("/cancel", verifyToken, rideController.cancelRide);
 
 module.exports = router;

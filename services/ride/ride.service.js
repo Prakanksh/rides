@@ -1,18 +1,12 @@
 const Ride = require("../../models/ride.model");
 const Driver = require("../../models/driver.model");
 const { responseData } = require("../../helpers/responseData");
-
 const { calculateDistanceInKm } = require("../../helpers/distance");
 const { calculateFare } = require("../../helpers/fareConfig");
-
-// IMPORT SOCKET EMITTER
-const { sendRideToDriver } = require("../../socket/emitRide");
+const { sendRideToDriver, sendToUser } = require("../../socket/emitRide");
 
 module.exports = {
 
-  // -----------------------------
-  // CREATE RIDE
-  // -----------------------------
   createRide: async (req, res) => {
     try {
       const {
@@ -52,7 +46,6 @@ module.exports = {
         status: "requested",
       });
 
-      // AUTO-ASSIGN (very basic: pick first available)
       const nearestDriver = await Driver.findOne({
         isAvailable: true,
         registrationStatus: "approved",
@@ -60,11 +53,8 @@ module.exports = {
       }).select("_id");
 
       if (nearestDriver) {
-        // assign (ride still in requested state until driver accepts)
         ride.driver = nearestDriver._id;
         await ride.save();
-
-        // send via socket
         const ok = sendRideToDriver(nearestDriver._id.toString(), ride);
         console.log("sendRideToDriver result:", ok);
       } else {
@@ -78,9 +68,6 @@ module.exports = {
     }
   },
 
-  // -----------------------------
-  // NEARBY DRIVERS
-  // -----------------------------
   nearbyDrivers: async (req, res) => {
     try {
       const { lat, lng } = req.query;
@@ -107,9 +94,6 @@ module.exports = {
     }
   },
 
-  // -----------------------------
-  // GET ONE RIDE
-  // -----------------------------
   getOneRide: async (req, res) => {
     const { rideId } = req.query;
 
@@ -123,9 +107,6 @@ module.exports = {
     return res.json(responseData("RIDE_DETAIL", { ride }, req, true));
   },
 
-  // -----------------------------
-  // GET ACTIVE RIDE
-  // -----------------------------
   getActiveRide: async (req, res) => {
     const userId = req.user._id;
 
@@ -139,9 +120,6 @@ module.exports = {
     return res.json(responseData("ACTIVE_RIDE", { ride }, req, true));
   },
 
-  // -----------------------------
-  // CANCEL RIDE
-  // -----------------------------
   cancelRide: async (req, res) => {
     const { rideId, reason } = req.body;
     const riderId = req.user?._id;
@@ -153,9 +131,23 @@ module.exports = {
       return res.json(responseData("RIDE_ALREADY_COMPLETED", {}, req, false));
     }
 
+    if (ride.status === "cancelled") {
+      return res.json(responseData("RIDE_ALREADY_CANCELLED", {}, req, false));
+    }
+
     ride.status = "cancelled";
-    ride.cancellationReason = reason || "user cancelled";
+    ride.cancellationReason = reason || "Cancelled by user";
+    ride.cancelledBy = "user";
+    ride.cancelledAt = new Date();
     await ride.save();
+
+    if (ride.driver) {
+      sendRideToDriver(ride.driver.toString(), { 
+        event: "rideCancelled", 
+        ride, 
+        cancelledBy: "user" 
+      });
+    }
 
     return res.json(responseData("RIDE_CANCELLED", { ride }, req, true));
   }

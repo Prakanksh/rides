@@ -1,4 +1,3 @@
-// models/ride.model.js
 const mongoose = require("mongoose");
 
 const RideSchema = new mongoose.Schema(
@@ -7,7 +6,7 @@ const RideSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "Driver",
       required: false,
-      default : null
+      default: null
     },
 
     rider: {
@@ -16,7 +15,6 @@ const RideSchema = new mongoose.Schema(
       required: true
     },
 
-    // Pickup GeoJSON location
     pickupLocation: {
       type: {
         type: String,
@@ -24,13 +22,12 @@ const RideSchema = new mongoose.Schema(
         default: "Point"
       },
       coordinates: {
-        type: [Number], // [lat, lng] or app uses [lat,lng]
+        type: [Number],
         required: true
       },
       address: { type: String, default: "" }
     },
 
-    // Drop GeoJSON location
     dropLocation: {
       type: {
         type: String,
@@ -38,13 +35,13 @@ const RideSchema = new mongoose.Schema(
         default: "Point"
       },
       coordinates: {
-        type: [Number], // [lat,lng]
+        type: [Number],
         required: true
       },
       address: { type: String, default: "" }
     },
 
-    distance: { type: Number, default: 0 }, // in km
+    distance: { type: Number, default: 0 },
     estimatedFare: { type: Number, default: 0 },
     finalFare: { type: Number, default: 0 },
     paymentMethod: {
@@ -73,8 +70,18 @@ const RideSchema = new mongoose.Schema(
     },
 
     cancellationReason: { type: String, default: "" },
+    cancelledBy: {
+      type: String,
+      enum: ["user", "driver", null],
+      default: null
+    },
+    cancelledAt: { type: Date, default: null },
+    cancelledDrivers: [{
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Driver"
+    }],
 
-    otpForRideStart: { type: String, default: null }, // 4-digit OTP like Ola/Uber
+    otpForRideStart: { type: String, default: null },
 
     startedAt: { type: Date, default: null },
     completedAt: { type: Date, default: null }

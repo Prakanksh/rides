@@ -1,4 +1,5 @@
 const Ride = require("../models/ride.model");
+const Driver = require("../models/driver.model");
 const { ensureWallets, payByWallet, payByCash } = require("../helpers/walletUtil");
 let ioInstance = null;
 
@@ -191,6 +192,115 @@ function initSocketIO(io) {
       } catch (e) { 
         console.error("=== SOCKET RIDE:COMPLETE ERROR ===", e); 
         socket.emit("ride:complete:response", { success: false, message: "SERVER_ERROR" }); 
+      }
+    });
+
+    socket.on("ride:cancel:user", async (payload) => {
+      try {
+        const { rideId, userId, reason } = payload || {};
+        if (!rideId || !userId) { 
+          socket.emit("ride:cancel:response", { success: false, message: "INVALID_PAYLOAD" }); 
+          return; 
+        }
+
+        const ride = await Ride.findOne({ _id: rideId, rider: userId });
+        if (!ride) { 
+          socket.emit("ride:cancel:response", { success: false, message: "INVALID_RIDE" }); 
+          return; 
+        }
+
+        if (ride.status === "completed" || ride.status === "cancelled") {
+          socket.emit("ride:cancel:response", { success: false, message: "RIDE_CANNOT_BE_CANCELLED" }); 
+          return;
+        }
+
+        ride.status = "cancelled";
+        ride.cancellationReason = reason || "Cancelled by user";
+        ride.cancelledBy = "user";
+        ride.cancelledAt = new Date();
+        await ride.save();
+
+        if (ride.driver) {
+          const driverSocket = getDriverSocketId(ride.driver);
+          if (driverSocket && ioInstance) {
+            ioInstance.to(driverSocket).emit("driver:rideCancelled", { ride, cancelledBy: "user" });
+          }
+        }
+
+        socket.emit("ride:cancel:response", { success: true, ride });
+      } catch (e) { 
+        console.error("ride:cancel:user err", e); 
+        socket.emit("ride:cancel:response", { success: false, message: "SERVER_ERROR" }); 
+      }
+    });
+
+    socket.on("ride:cancel:driver", async (payload) => {
+      try {
+        const { rideId, driverId, reason } = payload || {};
+        if (!rideId || !driverId) { 
+          socket.emit("ride:cancel:response", { success: false, message: "INVALID_PAYLOAD" }); 
+          return; 
+        }
+
+        const ride = await Ride.findOne({ _id: rideId, driver: driverId });
+        if (!ride) { 
+          socket.emit("ride:cancel:response", { success: false, message: "INVALID_RIDE" }); 
+          return; 
+        }
+
+        if (ride.status === "completed" || ride.status === "cancelled") {
+          socket.emit("ride:cancel:response", { success: false, message: "RIDE_CANNOT_BE_CANCELLED" }); 
+          return;
+        }
+
+        if (ride.status === "ongoing") {
+          socket.emit("ride:cancel:response", { success: false, message: "CANNOT_CANCEL_ONGOING_RIDE" }); 
+          return;
+        }
+
+        ride.cancelledDrivers.push(driverId);
+        ride.driver = null;
+        ride.status = "requested";
+        ride.otpForRideStart = null;
+        await ride.save();
+
+        const newDriver = await Driver.findOne({
+          _id: { $nin: ride.cancelledDrivers },
+          isAvailable: true,
+          registrationStatus: "approved",
+          status: "active"
+        }).select("_id");
+
+        if (newDriver) {
+          ride.driver = newDriver._id;
+          await ride.save();
+
+          const newDriverSocket = getDriverSocketId(newDriver._id);
+          if (newDriverSocket && ioInstance) {
+            ioInstance.to(newDriverSocket).emit("ride:new", ride);
+          }
+
+          const riderSocket = getUserSocketId(ride.rider);
+          if (riderSocket && ioInstance) {
+            ioInstance.to(riderSocket).emit("user:driverChanged", { ride, message: "Your driver cancelled. New driver assigned!" });
+          } else {
+            ioInstance.to(`user:${ride.rider}`).emit("user:driverChanged", { ride, message: "Your driver cancelled. New driver assigned!" });
+          }
+
+          socket.emit("ride:cancel:response", { success: true, ride, newDriverAssigned: true });
+        } else {
+          const riderSocket = getUserSocketId(ride.rider);
+          if (riderSocket && ioInstance) {
+            ioInstance.to(riderSocket).emit("user:searchingDriver", { ride, message: "Your driver cancelled. Finding new driver..." });
+          } else {
+            ioInstance.to(`user:${ride.rider}`).emit("user:searchingDriver", { ride, message: "Your driver cancelled. Finding new driver..." });
+          }
+
+          socket.emit("ride:cancel:response", { success: true, ride, newDriverAssigned: false });
+        }
+      } catch (e) { 
+        console.error("ride:cancel:driver err", e); 
+        socket.emit("ride:cancel:response", { success: false, message: "SERVER_ERROR" }); 
       }
     });
 
