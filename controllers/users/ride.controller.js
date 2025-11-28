@@ -3,12 +3,7 @@ const rideService = require("../../services/ride/ride.service");
 
 module.exports = {
   createRide: async (req, res) => {
-    try {
-      await rideService.createRide(req, res);
-    } catch (err) {
-      const msg = err.message || "SOMETHING_WENT_WRONG";
-      return res.json(responseData(msg, {}, req, false));
-    }
+    try { await rideService.createRide(req, res); } catch (err) { return res.json(responseData(err.message || "SOMETHING_WENT_WRONG", {}, req, false)); }
   },
 
   nearbyDrivers: async (req, res) => {

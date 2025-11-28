@@ -6,7 +6,6 @@ const rideController = require("../../controllers/users/ride.controller");
 
 // Create a new ride
 router.post("/create", verifyToken, rideController.createRide);
-
 // Get nearby drivers
 router.get("/nearby", verifyToken, rideController.nearbyDrivers);
 

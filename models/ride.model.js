@@ -1,3 +1,4 @@
+// models/ride.model.js
 const mongoose = require("mongoose");
 
 const RideSchema = new mongoose.Schema(
@@ -6,7 +7,7 @@ const RideSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "Driver",
       required: false,
-      default: null
+      default : null
     },
 
     rider: {
@@ -23,7 +24,7 @@ const RideSchema = new mongoose.Schema(
         default: "Point"
       },
       coordinates: {
-        type: [Number], // [lat, lng] your request sends lat, lng - allowed here
+        type: [Number], // [lat, lng] or app uses [lat,lng]
         required: true
       },
       address: { type: String, default: "" }
@@ -37,36 +38,35 @@ const RideSchema = new mongoose.Schema(
         default: "Point"
       },
       coordinates: {
-        type: [Number], // [lat, lng]
+        type: [Number], // [lat,lng]
         required: true
       },
       address: { type: String, default: "" }
     },
 
-    distance: { type: Number, default: 0 }, // KM
+    distance: { type: Number, default: 0 }, // in km
     estimatedFare: { type: Number, default: 0 },
     finalFare: { type: Number, default: 0 },
-
     paymentMethod: {
       type: String,
-      enum: ["cash", "online"],
+      enum: ["cash", "online", "wallet"],
       default: "cash"
     },
 
     vehicleType: {
       type: String,
-      enum: ["auto", "two-wheeler", "mini", "prime sedan", "suv"],
+      enum: ["two-wheeler", "auto", "mini", "prime sedan", "suv"],
       required: true
     },
 
     status: {
       type: String,
       enum: [
-        "requested",
-        "accepted",
-        "arrived",
-        "ongoing",
-        "completed",
+        "requested", 
+        "accepted", 
+        "arrived", 
+        "ongoing", 
+        "completed", 
         "cancelled"
       ],
       default: "requested"
@@ -74,7 +74,7 @@ const RideSchema = new mongoose.Schema(
 
     cancellationReason: { type: String, default: "" },
 
-    otpForRideStart: { type: String, default: null }, // 4-digit ride start OTP
+    otpForRideStart: { type: String, default: null }, // 4-digit OTP like Ola/Uber
 
     startedAt: { type: Date, default: null },
     completedAt: { type: Date, default: null }
@@ -82,7 +82,6 @@ const RideSchema = new mongoose.Schema(
   { timestamps: true, versionKey: false }
 );
 
-// Geo Indexes
 RideSchema.index({ pickupLocation: "2dsphere" });
 RideSchema.index({ dropLocation: "2dsphere" });
 

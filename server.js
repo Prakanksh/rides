@@ -13,15 +13,12 @@ const http = require('http');
 const server = http.createServer(app);
 
 const { Server } = require("socket.io");
-const io = new Server(server, {
-  cors: {
-    origin: "*",
-    methods: ["GET", "POST"]
-  }
-});
+const io = new Server(server, { cors: { origin: "*", methods: ["GET","POST"] } });
 
+// initialize emits (will register socket handlers)
 const { initSocketIO } = require("./socket/emitRide");
 initSocketIO(io);
+
 
 // -------------------------
 // INITIALIZE DATABASE

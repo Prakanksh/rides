@@ -1,168 +1,134 @@
 // services/ride/driverRide.service.js
+
 const Ride = require("../../models/ride.model");
 const { responseData } = require("../../helpers/responseData");
 
-// small helper to generate 4-digit OTP as string
-const generate4DigitOtp = () => String(Math.floor(1000 + Math.random() * 9000));
+const { ensureWallets, payByWallet, payByCash } = require("../../helpers/walletUtil");
+
+// generate OTP
+const genOtp = () => String(Math.floor(1000 + Math.random() * 9000));
 
 module.exports = {
-  // -----------------------------
-  // FETCH ASSIGNED RIDE
-  // -----------------------------
+
   getAssignedRide: async (req, res) => {
-    try {
-      const driverId = req.user._id;
-
-      const ride = await Ride.findOne({
-        driver: driverId,
-        status: { $in: ["requested", "accepted", "arrived", "ongoing"] }
-      });
-
-      return res.json(responseData("ASSIGNED_RIDE", { ride }, req, true));
-    } catch (err) {
-      console.log("getAssignedRide err:", err);
-      return res.json(responseData("ERROR_OCCUR", err.message, req, false));
-    }
+    const ride = await Ride.findOne({
+      driver: req.user._id,
+      status: { $in: ["requested", "accepted", "arrived", "ongoing"] }
+    });
+    return res.json(responseData("ASSIGNED_RIDE", { ride }, req, true));
   },
 
-  // -----------------------------
-  // ACCEPT RIDE
-  // -----------------------------
   acceptRide: async (req, res) => {
-    try {
-      const { rideId } = req.body;
-      const driverId = req.user._id;
+    const ride = await Ride.findById(req.body.rideId);
+    if (!ride) return res.json(responseData("RIDE_NOT_FOUND", {}, req, false));
+    if (ride.status !== "requested")
+      return res.json(responseData("RIDE_ALREADY_ASSIGNED", {}, req, false));
 
-      if (!rideId) return res.json(responseData("RIDE_ID_REQUIRED", {}, req, false));
+    ride.driver = req.user._id;
+    ride.status = "accepted";
+    await ride.save();
 
-      const ride = await Ride.findById(rideId);
-      if (!ride) return res.json(responseData("RIDE_NOT_FOUND", {}, req, false));
-
-      if (ride.status !== "requested") {
-        return res.json(responseData("RIDE_ALREADY_ASSIGNED", {}, req, false));
-      }
-
-      ride.driver = driverId;
-      ride.status = "accepted";
-      await ride.save();
-
-      return res.json(responseData("RIDE_ACCEPTED", { ride }, req, true));
-    } catch (err) {
-      console.log("acceptRide err:", err);
-      return res.json(responseData("ERROR_OCCUR", err.message, req, false));
-    }
+    return res.json(responseData("RIDE_ACCEPTED", { ride }, req, true));
   },
 
-  // -----------------------------
-  // DRIVER ARRIVED AT PICKUP
-  // - generate OTP and save to ride.otpForRideStart
-  // -----------------------------
   arrivedAtPickup: async (req, res) => {
-    try {
-      const { rideId } = req.body;
-      const driverId = req.user._id;
+    const ride = await Ride.findOne({
+      _id: req.body.rideId,
+      driver: req.user._id
+    });
 
-      if (!rideId) return res.json(responseData("RIDE_ID_REQUIRED", {}, req, false));
+    if (!ride) return res.json(responseData("INVALID_RIDE", {}, req, false));
+    if (ride.status !== "accepted")
+      return res.json(responseData("RIDE_NOT_IN_ACCEPTED_STATE", {}, req, false));
 
-      const ride = await Ride.findOne({ _id: rideId, driver: driverId });
-      if (!ride) return res.json(responseData("INVALID_RIDE", {}, req, false));
+    ride.status = "arrived";
+    ride.otpForRideStart = genOtp();
+    ride.updatedAt = new Date();
+    await ride.save();
 
-      if (ride.status !== "accepted") {
-        return res.json(responseData("RIDE_NOT_IN_ACCEPTED_STATE", {}, req, false));
-      }
-
-      // set arrived state
-      ride.status = "arrived";
-      ride.updatedAt = new Date();
-
-      // generate OTP for ride start and save it (string)
-      const otp = generate4DigitOtp();
-      ride.otpForRideStart = otp;
-
-      await ride.save();
-
-      // NOTE: returning OTP in response only for testing/dev.
-      // In production you'd send it to the rider via SMS/notification instead.
-      return res.json(
-        responseData(
-          "DRIVER_ARRIVED",
-          { ride, otpForTesting: otp },
-          req,
-          true
-        )
-      );
-    } catch (err) {
-      console.log("arrivedAtPickup err:", err);
-      return res.json(responseData("ERROR_OCCUR", err.message, req, false));
-    }
+    return res.json(
+      responseData("DRIVER_ARRIVED", { ride, otpForTesting: ride.otpForRideStart }, req, true)
+    );
   },
 
-  // -----------------------------
-  // START RIDE
-  // - requires otp in body and validates it
-  // -----------------------------
   startRide: async (req, res) => {
-    try {
-      const { rideId, otp } = req.body;
-      const driverId = req.user._id;
+    const { rideId, otp } = req.body;
 
-      if (!rideId) return res.json(responseData("RIDE_ID_REQUIRED", {}, req, false));
-      if (!otp) return res.json(responseData("OTP_REQUIRED", {}, req, false));
+    const ride = await Ride.findOne({
+      _id: rideId,
+      driver: req.user._id
+    });
 
-      const ride = await Ride.findOne({ _id: rideId, driver: driverId });
-      if (!ride) return res.json(responseData("INVALID_RIDE", {}, req, false));
+    if (!ride) return res.json(responseData("INVALID_RIDE", {}, req, false));
+    if (ride.status !== "arrived")
+      return res.json(responseData("RIDE_NOT_READY_TO_START", {}, req, false));
+    if (String(ride.otpForRideStart) !== String(otp))
+      return res.json(responseData("INVALID_OTP", {}, req, false));
 
-      if (ride.status !== "arrived") {
-        return res.json(responseData("RIDE_NOT_READY_TO_START", {}, req, false));
-      }
+    ride.otpForRideStart = null;
+    ride.status = "ongoing";
+    ride.startedAt = new Date();
+    await ride.save();
 
-      // check OTP
-      if (!ride.otpForRideStart) {
-        return res.json(responseData("OTP_NOT_GENERATED", {}, req, false));
-      }
-
-      if (String(ride.otpForRideStart) !== String(otp)) {
-        return res.json(responseData("INVALID_OTP", {}, req, false));
-      }
-
-      // OTP valid — clear it and start ride
-      ride.otpForRideStart = null;
-      ride.status = "ongoing";
-      ride.startedAt = new Date();
-      await ride.save();
-
-      return res.json(responseData("RIDE_STARTED", { ride }, req, true));
-    } catch (err) {
-      console.log("startRide err:", err);
-      return res.json(responseData("ERROR_OCCUR", err.message, req, false));
-    }
+    return res.json(responseData("RIDE_STARTED", { ride }, req, true));
   },
 
-  // -----------------------------
-  // COMPLETE RIDE
-  // -----------------------------
   completeRide: async (req, res) => {
     try {
-      const { rideId } = req.body;
-      const driverId = req.user._id;
+      console.log("=== COMPLETE RIDE START ===");
+      console.log("rideId:", req.body.rideId);
+      console.log("driverId from token:", req.user._id);
 
-      if (!rideId) return res.json(responseData("RIDE_ID_REQUIRED", {}, req, false));
+      const ride = await Ride.findOne({
+        _id: req.body.rideId,
+        driver: req.user._id
+      });
 
-      const ride = await Ride.findOne({ _id: rideId, driver: driverId });
+      console.log("Ride found:", ride ? "YES" : "NO");
 
       if (!ride) return res.json(responseData("INVALID_RIDE", {}, req, false));
       if (ride.status !== "ongoing") {
+        console.log("Ride status is:", ride.status, "- expected 'ongoing'");
         return res.json(responseData("RIDE_NOT_STARTED", {}, req, false));
+      }
+
+      const finalFare = ride.finalFare || ride.estimatedFare;
+      console.log("Final fare:", finalFare);
+      console.log("Payment method:", ride.paymentMethod);
+      console.log("Rider ID:", ride.rider);
+
+      // create wallets if missing
+      console.log("Creating wallets...");
+      await ensureWallets(ride.rider, req.user._id);
+      console.log("Wallets ensured");
+
+      let result;
+
+      if (ride.paymentMethod === "wallet") {
+        console.log("Processing wallet payment...");
+        result = await payByWallet(ride, ride.rider, req.user._id, finalFare);
+      } else {
+        console.log("Processing cash payment...");
+        result = await payByCash(ride, ride.rider, req.user._id, finalFare);
+      }
+
+      console.log("Payment result:", result);
+
+      if (!result.success) {
+        return res.json(responseData(result.message, {}, req, false));
       }
 
       ride.status = "completed";
       ride.completedAt = new Date();
+      ride.finalFare = finalFare;
       await ride.save();
 
+      console.log("=== RIDE COMPLETED SUCCESSFULLY ===");
       return res.json(responseData("RIDE_COMPLETED", { ride }, req, true));
-    } catch (err) {
-      console.log("completeRide err:", err);
-      return res.json(responseData("ERROR_OCCUR", err.message, req, false));
+    } catch (error) {
+      console.error("=== COMPLETE RIDE ERROR ===");
+      console.error(error);
+      return res.json(responseData(error.message || "SOMETHING_WENT_WRONG", {}, req, false));
     }
-  },
+  }
 };

@@ -29,13 +29,14 @@ module.exports = {
         return res.json(responseData("LOCATIONS_REQUIRED", {}, req, false));
       }
 
+      if (!vehicleType) {
+        return res.json(responseData("VEHICLE_TYPE_REQUIRED", {}, req, false));
+      }
+
       const [pickupLat, pickupLng] = pickupLocation.coordinates;
       const [dropLat, dropLng] = dropLocation.coordinates;
 
-      const distanceKm = calculateDistanceInKm(
-        pickupLat, pickupLng, dropLat, dropLng
-      );
-
+      const distanceKm = calculateDistanceInKm(pickupLat, pickupLng, dropLat, dropLng);
       const fareData = calculateFare(distanceKm);
 
       let ride = await Ride.create({
@@ -51,7 +52,7 @@ module.exports = {
         status: "requested",
       });
 
-      // AUTO ASSIGN DRIVER (very basic)
+      // AUTO-ASSIGN (very basic: pick first available)
       const nearestDriver = await Driver.findOne({
         isAvailable: true,
         registrationStatus: "approved",
@@ -59,22 +60,21 @@ module.exports = {
       }).select("_id");
 
       if (nearestDriver) {
+        // assign (ride still in requested state until driver accepts)
         ride.driver = nearestDriver._id;
         await ride.save();
 
-        // Send via socket
-        sendRideToDriver(nearestDriver._id.toString(), ride);
+        // send via socket
+        const ok = sendRideToDriver(nearestDriver._id.toString(), ride);
+        console.log("sendRideToDriver result:", ok);
+      } else {
+        console.log("No available drivers to auto-assign");
       }
 
-      return res.json(responseData(
-        "RIDE_CREATED",
-        { ride, fareBreakdown: fareData.breakdown },
-        req,
-        true
-      ));
+      return res.json(responseData("RIDE_CREATED", { ride, fareBreakdown: fareData.breakdown }, req, true));
     } catch (err) {
-      console.error("Create Ride Error:", err);
-      return res.json(responseData(err.message, {}, req, false));
+      console.error("createRide err:", err);
+      return res.json(responseData(err.message || "SERVER_ERROR", {}, req, false));
     }
   },
 
