@@ -1,4 +1,3 @@
-// socket/emitRide.js
 const Ride = require("../models/ride.model");
 const { ensureWallets, payByWallet, payByCash } = require("../helpers/walletUtil");
 let ioInstance = null;
@@ -13,7 +12,6 @@ const {
   updateDriverLocation
 } = require("./driverSocketMap");
 
-// Initialize IO and handlers
 function initSocketIO(io) {
   ioInstance = io;
 
@@ -43,7 +41,7 @@ function initSocketIO(io) {
         const { driverId, lat, lng } = data || {};
         if (!driverId || lat == null || lng == null) return;
         updateDriverLocation(driverId, lat, lng);
-        // forward to user's room if driver has active ride
+        
         const activeRide = await Ride.findOne({
           driver: driverId,
           status: { $in: ["accepted", "arrived", "ongoing"] }
@@ -61,7 +59,6 @@ function initSocketIO(io) {
       } catch (e) { console.error("driver:location err", e); }
     });
 
-    // driver accepts via socket
     socket.on("ride:accept", async (payload) => {
       try {
         const { rideId, driverId } = payload || {};
@@ -88,7 +85,6 @@ function initSocketIO(io) {
       } catch (e) { console.error("ride:accept err", e); socket.emit("ride:accept:response", { success:false, message:"SERVER_ERROR" }); }
     });
 
-    // arrived
     socket.on("ride:arrived", async (payload) => {
       try {
         const { rideId, driverId } = payload || {};
@@ -109,7 +105,6 @@ function initSocketIO(io) {
       } catch (e) { console.error("ride:arrived err", e); socket.emit("ride:arrived:response", { success:false, message:"SERVER_ERROR" }); }
     });
 
-    // start
     socket.on("ride:start", async (payload) => {
       try {
         const { rideId, driverId, otp } = payload || {};
@@ -129,7 +124,6 @@ function initSocketIO(io) {
       } catch (e) { console.error("ride:start err", e); socket.emit("ride:start:response",{success:false,message:"SERVER_ERROR"}); }
     });
 
-    // complete
     socket.on("ride:complete", async (payload) => {
       try {
         console.log("=== SOCKET RIDE:COMPLETE ===");
@@ -159,12 +153,10 @@ function initSocketIO(io) {
         console.log("Final fare:", finalFare);
         console.log("Payment method:", ride.paymentMethod);
 
-        // Ensure wallets exist
         console.log("Creating wallets...");
         await ensureWallets(ride.rider, driverId);
         console.log("Wallets ensured");
 
-        // Process payment
         let result;
         if (ride.paymentMethod === "wallet") {
           console.log("Processing wallet payment...");
@@ -181,7 +173,6 @@ function initSocketIO(io) {
           return;
         }
 
-        // Update ride status
         ride.status = "completed";
         ride.completedAt = new Date();
         ride.finalFare = finalFare;
@@ -189,7 +180,6 @@ function initSocketIO(io) {
 
         console.log("=== RIDE COMPLETED SUCCESSFULLY VIA SOCKET ===");
 
-        // Notify user
         const riderSocket = getUserSocketId(ride.rider);
         if (riderSocket && ioInstance) {
           ioInstance.to(riderSocket).emit("user:rideCompleted", { ride });
@@ -204,7 +194,6 @@ function initSocketIO(io) {
       }
     });
 
-    // cleanup
     socket.on("disconnect", () => {
       try {
         removeDriverSocketBySocketId(socket.id);

@@ -1,11 +1,7 @@
-// services/ride/driverRide.service.js
-
 const Ride = require("../../models/ride.model");
 const { responseData } = require("../../helpers/responseData");
-
 const { ensureWallets, payByWallet, payByCash } = require("../../helpers/walletUtil");
 
-// generate OTP
 const genOtp = () => String(Math.floor(1000 + Math.random() * 9000));
 
 module.exports = {
@@ -97,7 +93,6 @@ module.exports = {
       console.log("Payment method:", ride.paymentMethod);
       console.log("Rider ID:", ride.rider);
 
-      // create wallets if missing
       console.log("Creating wallets...");
       await ensureWallets(ride.rider, req.user._id);
       console.log("Wallets ensured");
