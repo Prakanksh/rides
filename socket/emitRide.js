@@ -14,6 +14,7 @@ const {
 } = require("./driverSocketMap");
 
 function initSocketIO(io) {
+
   ioInstance = io;
 
   io.on("connection", (socket) => {

@@ -57,6 +57,7 @@ const adminTestimonialRouter = require('./routes/admins/testimonial.route');
 const adminEarningRouter = require('./routes/admins/earning.route');
 const adminProductRouter = require('./routes/admins/product.route');
 const adminSubscriptionRouter = require('./routes/admins/subscription.route');
+const adminDriversRouter = require('./routes/admins/driver.route');
 
 // Driver routes
 const driverRoutes = require('./routes/driver/driver.route');
@@ -114,6 +115,8 @@ app.use('/v1/admin/product', adminProductRouter);
 app.use('/v1/admin/testimonial', adminTestimonialRouter);
 app.use('/v1/admin/subscription', adminSubscriptionRouter);
 app.use('/v1/admin/earning', adminEarningRouter);
+app.use('/v1/admin/driver', adminDriversRouter);
+
 
 // -------------------------
 // USER ROUTES

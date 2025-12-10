@@ -10,6 +10,6 @@ router
   .get('/details', [verifyToken], user.userDetail)
   .get('/orders', [verifyToken], user.userOrderList)
   .put('/status-change/:id', [verifyToken], user.statusChange)
-
+   
   // .get('/unused-aws-url',[verifyToken], user.awsUrl)
 module.exports = router

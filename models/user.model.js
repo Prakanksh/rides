@@ -105,7 +105,7 @@ const userSchema = new mongoose.Schema(
       ENUM: ['active', 'inactive', 'deleted'],
       default: 'active'
     },
-    isDeleted: {
+    isDeleted : {
       type: Boolean,
       default: false
     },

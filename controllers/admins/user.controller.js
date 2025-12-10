@@ -35,6 +35,7 @@ module.exports = {
   },
   statusChange: async (req, res) => {
     try {
+      
       await userService.statusChange(req, res)
     } catch (err) {
       const msg = err.message || 'SOMETHING_WENT_WRONG'
@@ -48,5 +49,13 @@ module.exports = {
       const msg = err.message || 'SOMETHING_WENT_WRONG'
       return res.status(422).json(responseData(msg, {}, req))
     }
-  }
+  },
+  //   changeStatus: async (req, res) => {
+  //     try {
+  //       await userService.changeStatus(req, res)
+  //     } catch (err) {
+  //       const msg = err.message || 'SOMETHING_WENT_WRONG'
+  //       return res.status(422).json(responseData(msg, {}, req))
+  //     }   
+  // }
 }

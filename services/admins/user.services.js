@@ -85,7 +85,7 @@ module.exports = {
           value: 'email'
         },
         {
-          label: 'No. of orders',
+          label: 'No. of orders', 
           value: 'orders'
         },
         {
@@ -342,6 +342,7 @@ module.exports = {
   statusChange: async (req, res) => {
     try {
       const { status } = req.body
+   
       const resp = await User.updateOne(
         { _id: req.params.id },
         { $set: { status } }
@@ -377,5 +378,6 @@ module.exports = {
     } catch (error) {
       return res.json(responseData('ERROR_OCCUR', error.message, req, false))
     }
-  }
+  },
+ 
 }
