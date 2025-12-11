@@ -127,5 +127,5 @@ router
   .get('/country-list', [], countryList)
   .get('/notification-favorite-count', [verifyToken], notificationAndFavoriteCount)
   .get('/sub-category-list', [], subCategoryListMasterData)
-
+  // .post('/user-document', [], userDocs.uploadDocuments)
 module.exports = router

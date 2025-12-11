@@ -978,5 +978,14 @@
   "MONTHS_EMPTY": {
     "en": "Number of months is required.",
     "ar": ""
+  },
+  "FETCH_USERS_FAILED":{
+      "en": "Failed to fetch users."
+  },
+  "DASHBOARD_DATA_NOT_FOUND":{
+ "en": "dashboard data not found."
+  },
+  "ADMIN_DASHBOARD_FETCHED":{
+ "en": "dashboard data fetched successfully."
   }
 }

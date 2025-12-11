@@ -5,6 +5,8 @@ const { responseData } = require('../../helpers/responseData')
 const constant = require('../../helpers/constant')
 const { default: mongoose } = require('mongoose')
 const { Parser } = require('json2csv')
+// const { getPaginationArray } = require("../../helpers/helper");
+const { userListBasePipeline } = require("../../helpers/commonAggregationPipeline");
 
 const {
   filterByStatus,
@@ -377,5 +379,41 @@ module.exports = {
     } catch (error) {
       return res.json(responseData('ERROR_OCCUR', error.message, req, false))
     }
+  },
+ getAllUsers: async (keyword, status, page = 1, limit = 10) => {
+  try {
+    const basePipeline = userListBasePipeline(keyword, status);
+
+    const finalPipeline = [
+      ...basePipeline,
+      ...getPaginationArray(page, limit)
+    ];
+
+    const result = await User.aggregate(finalPipeline);
+
+    return result.length > 0
+      ? result[0]
+      : {
+          docs: [],
+          totalDocs: 0,
+          page,
+          limit,
+          totalPages: 0
+        };
+
+  } catch (error) {
+    console.log("User list error:", error);
+    return {
+      docs: [],
+      totalDocs: 0,
+      limit,
+      page,
+      totalPages: 0
+    };
   }
 }
+
+}
+
+
+

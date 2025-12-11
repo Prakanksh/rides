@@ -1002,4 +1002,25 @@ module.exports = {
       console.log('SMS Fails err', err?.message)
     }
   }
+  ,
+    parseMultipartJSONFields: (fields) => (req, res, next) => {
+  if (!req.body) req.body = {};
+
+  for (const field of fields) {
+    if (req.body[field] && typeof req.body[field] === 'string') {
+      // Only parse if it looks like JSON
+      if (req.body[field].startsWith('{') || req.body[field].startsWith('[')) {
+        try {
+          req.body[field] = JSON.parse(req.body[field]);
+        } catch (err) {
+          return res.status(400).json({
+            success: false,
+            message: `${field.toUpperCase()}_INVALID_JSON`
+          });
+        }
+      }
+    }
+  }
+  next();
+}
 }

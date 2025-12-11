@@ -72,5 +72,32 @@ module.exports = {
       const msg = err.message || 'SOMETHING_WENT_WRONG'
       return res.status(422).json(responseData(msg, {}, req))
     }
+  },
+  getAdminDashboard: async (req, res) => {
+  try {
+    const result = await adminService.getAdminDashboardData();
+
+    if (!result.success) {
+      return res
+        .status(400)
+        .json(responseData(result.message, {}, req, false));
+    }
+
+    return res
+      .status(200)
+      .json(responseData(result.message, result.data, req, true));
+  } catch (error) {
+    return res
+      .status(500)
+      .json(
+        responseData(
+          error.message || "SERVER_ERROR",
+          { error: error.message },
+          req,
+          false
+        )
+      );
   }
+},
+
 }

@@ -678,4 +678,256 @@ module.exports = {
       preserveNullAndEmptyArrays: true
     }
   },
+
+
+userListBasePipeline: (keyword, status) => {
+  let match = {
+    isDeleted: { $ne: true }
+  };
+
+  // Status filter
+  if (status && status.trim() !== "") {
+    match.status = status; // Match exact status
+  }
+
+  // Keyword filter
+  if (keyword && keyword.trim() !== "") {
+    match.$or = [
+      { firstName: { $regex: keyword, $options: "i" } },
+      { lastName: { $regex: keyword, $options: "i" } },
+      { email: { $regex: keyword, $options: "i" } },
+      { mobile: { $regex: keyword, $options: "i" } }
+    ];
+  }
+
+  return [
+    { $match: match },
+    { $sort: { updatedAt: -1 } },
+    {
+      $project: {
+        password: 0,
+        deviceToken: 0,
+        refreshToken: 0,
+        socialId: 0,
+        __v: 0
+      }
+    }
+  ];
 }
+,
+
+getAdminDashboardPipeline: () => {
+  return [
+    {
+      $facet: {
+        users: [
+          { $match: { role: "user", isDeleted: false } },
+          { $count: "totalUsers" }
+        ],
+
+        drivers: [
+          {
+            $lookup: {
+              from: "drivers",
+              pipeline: [
+                { $match: { status: "active" } },
+                { $count: "totalDrivers" }
+              ],
+              as: "driverCount"
+            }
+          },
+          {
+            $project: {
+              totalDrivers: { $arrayElemAt: ["$driverCount.totalDrivers", 0] }
+            }
+          }
+        ],
+
+        rides: [
+          {
+            $lookup: {
+              from: "rides",
+              pipeline: [
+                {
+                  $group: {
+                    _id: null,
+                    totalRides: { $sum: 1 },
+                    cancelledRides: {
+                      $sum: {
+                        $cond: [{ $eq: ["$status", "cancelled"] }, 1, 0]
+                      }
+                    },
+                    totalRevenue: {
+                      $sum: "$paymentDetails.adminCommissionAmount"
+                    },
+                    totalDriverEarnings: {
+                      $sum: "$paymentDetails.driverReceivedAmount"
+                    }
+                  }
+                }
+              ],
+              as: "rideSummary"
+            }
+          },
+          {
+            $project: {
+              totalRides: { $arrayElemAt: ["$rideSummary.totalRides", 0] },
+              cancelledRides: {
+                $arrayElemAt: ["$rideSummary.cancelledRides", 0]
+              },
+              totalRevenue: { $arrayElemAt: ["$rideSummary.totalRevenue", 0] },
+              totalDriverEarnings: {
+                $arrayElemAt: ["$rideSummary.totalDriverEarnings", 0]
+              }
+            }
+          }
+        ],
+        recentUsers: [
+          { $match: { role: "user", isDeleted: false } },
+          { $sort: { createdAt: -1 } },
+          { $limit: 5 },
+          {
+            $project: {
+              _id: 1,
+              fullName: 1,
+              mobile: 1,
+              email: 1,
+              createdAt: 1
+            }
+          }
+        ],
+
+        recentDrivers: [
+          {
+            $lookup: {
+              from: "drivers",
+              pipeline: [
+                { $match: { status: "active" } },
+                { $sort: { createdAt: -1 } },
+                { $limit: 5 },
+                {
+                  $project: {
+                    _id: 1,
+                    firstName: 1,
+                    lastName: 1,
+                    mobile: 1,
+                    createdAt: 1
+                  }
+                }
+              ],
+              as: "recentDrivers"
+            }
+          },
+          { $project: { recentDrivers: 1 } }
+        ],
+
+ 
+        recentRides: [
+          {
+            $lookup: {
+              from: "rides",
+              pipeline: [
+                { $sort: { createdAt: -1 } },
+                { $limit: 5 },
+                {
+                  $project: {
+                    _id: 1,
+                    rider: 1,
+                    driver: 1,
+                    finalFare: 1,
+                    status: 1,
+                    createdAt: 1
+                  }
+                }
+              ],
+              as: "recentRides"
+            }
+          },
+          { $project: { recentRides: 1 } }
+        ]
+      }
+    },
+
+    // ------------------------------------------------
+    // FINAL RESPONSE SHAPE
+    // ------------------------------------------------
+    {
+      $project: {
+        totalUsers: { $arrayElemAt: ["$users.totalUsers", 0] },
+        totalDrivers: { $arrayElemAt: ["$drivers.totalDrivers", 0] },
+
+        totalRides: { $arrayElemAt: ["$rides.totalRides", 0] },
+        cancelledRides: { $arrayElemAt: ["$rides.cancelledRides", 0] },
+        totalRevenue: { $arrayElemAt: ["$rides.totalRevenue", 0] },
+        totalDriverEarnings: {
+          $arrayElemAt: ["$rides.totalDriverEarnings", 0]
+        },
+
+        recentUsers: "$recentUsers",
+        recentDrivers: { $arrayElemAt: ["$recentDrivers.recentDrivers", 0] },
+        recentRides: { $arrayElemAt: ["$recentRides.recentRides", 0] }
+      }
+    }
+  ];
+}
+
+
+
+}
+
+
+
+
+
+
+
+
+
+
+  // const { default: mongoose } = require("mongoose")
+
+  // module.exports = {
+
+
+  //   userListBasePipeline : (page, limit) => {
+  //   return [
+  //     {
+  //       $facet: {
+  //         docs: [
+  //           { $skip: (page - 1) * limit },
+  //           { $limit: limit }
+  //         ],
+  //         totalDocs: [
+  //           { $count: "count" }
+  //         ]
+  //       }
+  //     },
+  //     {
+  //       $project: {
+  //         docs: 1,
+  //         totalDocs: {
+  //           $ifNull: [{ $arrayElemAt: ["$totalDocs.count", 0] }, 0]
+  //         },
+  //         limit: { $literal: limit },
+  //         page: { $literal: page },
+  //         totalPages: {
+  //           $ceil: {
+  //             $divide: [
+  //               { $ifNull: [{ $arrayElemAt: ["$totalDocs.count", 0] }, 0] },
+  //               limit
+  //             ]
+  //           }
+  //         }
+  //       }
+  //     }
+  //   ];
+  // }
+  // }
+
+
+
+
+
+
+
+

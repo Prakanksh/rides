@@ -1,3 +1,4 @@
+const { constant } = require('lodash')
 const { responseData } = require('../../helpers/responseData')
 const userService = require('../../services/admins/user.services')
 module.exports = {
@@ -48,5 +49,39 @@ module.exports = {
       const msg = err.message || 'SOMETHING_WENT_WRONG'
       return res.status(422).json(responseData(msg, {}, req))
     }
+  },
+getAllUsers: async (req, res) => {
+  try {
+    const { keyword, status, page = 1, limit = 10 } = req.query;
+
+    const result = await userService.getAllUsers(
+      keyword,
+      status,
+      parseInt(page),
+      parseInt(limit)
+    );
+
+    return res.status(200).json(
+      responseData(
+        'GET_LIST',
+        result || constant.staticResponseForEmptyResult,
+        req,
+        true
+      )
+    );
+
+  } catch (error) {
+    return res.status(400).json(
+      responseData(
+        'FETCH_USERS_FAILED',
+        { error: error.message },
+        req,
+        false
+      )
+    );
   }
 }
+
+};
+
+

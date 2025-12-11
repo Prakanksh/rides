@@ -19,6 +19,8 @@ const {
 const ejs = require('ejs')
 const constant = require('../../helpers/constant')
 const Country = require('../../models/countries.model')
+const { getAdminDashboardPipeline } = require('../../helpers/commonAggregationPipeline')
+const User = require('../../models/user.model')
 
 module.exports = {
   adminLogin: async (req, res) => {
@@ -340,7 +342,21 @@ module.exports = {
     } catch (error) {
       return res.json(responseData('ERROR_OCCUR', error.message, req, false))
     }
+  },
+  getAdminDashboardData: async () => {
+  try {
+    const pipeline = getAdminDashboardPipeline();
+    const result = await User.aggregate(pipeline); // Use ANY collection (User) to run pipeline
+
+    if (!result || result.length === 0) {
+      return { success: false, message: "DASHBOARD_DATA_NOT_FOUND" };
+    }
+
+    return { success: true, message: "ADMIN_DASHBOARD_FETCHED", data: result[0] };
+  } catch (error) {
+    return { success: false, message: error.message || "SERVER_ERROR" };
   }
+}
 }
 
 const isInvalidRequest = (type) => isEmpty(type)
@@ -374,4 +390,5 @@ const updateVisibilityStatus = async (model, id, visibility, req, res) => {
   } else {
     return res.json(responseData('NOT_FOUND', {}, req, false))
   }
+  
 }

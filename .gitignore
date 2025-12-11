@@ -5,3 +5,4 @@ public/files
 package-lock.json
 .vscode
 .env
+uploads
