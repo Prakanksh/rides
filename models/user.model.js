@@ -154,6 +154,10 @@ const userSchema = new mongoose.Schema(
     forceLogout: {
       type: Boolean,
       default: false
+    },
+    wallet: {
+      type: Number,
+      default: 0
     }
   },
   {
@@ -164,14 +168,25 @@ const userSchema = new mongoose.Schema(
 )
 
 userSchema.pre('save', function (next) {
-  mongoose
-    .model('users')
-    .findOne({})
-    .sort({ userId: -1 })
-    .then((entry) => {
-      this.userId = (parseInt(entry?.userId) || 0) + 1
-      next()
-    })
+  // Round wallet to 2 decimal places
+  if (this.wallet !== undefined && this.wallet !== null) {
+    this.wallet = Number(this.wallet.toFixed(2));
+  }
+  
+  // Only set userId for new documents
+  if (this.isNew && !this.userId) {
+    mongoose
+      .model('users')
+      .findOne({})
+      .sort({ userId: -1 })
+      .then((entry) => {
+        this.userId = (parseInt(entry?.userId) || 0) + 1
+        next()
+      })
+      .catch((err) => next(err))
+  } else {
+    next()
+  }
 })
 
 const User = mongoose.model('users', userSchema)

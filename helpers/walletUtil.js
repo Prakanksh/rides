@@ -112,6 +112,9 @@ async function payByWallet(ride, userId, driverId, finalFare) {
   // Update ride: paidToDriver = true (as soon as driver transaction is created)
   ride.paidToDriver = true;
   ride.transactionId = userToDriverTx._id;
+  if (!ride.paymentDetails) {
+    ride.paymentDetails = {};
+  }
   ride.paymentDetails.userPaidAmount = roundedFinalFare;
   ride.paymentDetails.driverReceivedAmount = roundedDriverShare;
   ride.driverReceivedAmount = roundedDriverShare;
@@ -139,6 +142,9 @@ async function payByWallet(ride, userId, driverId, finalFare) {
 
   // Update ride: paidToAdmin = true (as soon as admin transaction is created)
   ride.paidToAdmin = true;
+  if (!ride.paymentDetails) {
+    ride.paymentDetails = {};
+  }
   ride.paymentDetails.adminCommissionAmount = roundedAdminCut;
   ride.adminCommissionAmount = roundedAdminCut;
   
@@ -202,24 +208,28 @@ async function payByCash(ride, userId, driverId, finalFare) {
   // Update ride: paidToDriver = true (as soon as driver transaction is created)
   ride.paidToDriver = true;
   ride.transactionId = userToDriverTx._id;
+  if (!ride.paymentDetails) {
+    ride.paymentDetails = {};
+  }
   ride.paymentDetails.userPaidAmount = roundedFinalFare;
   ride.paymentDetails.driverReceivedAmount = roundedFinalFare; // Full fare for cash
   ride.driverReceivedAmount = roundedFinalFare; // Full fare for cash
-  await ride.save();
-
+  
   // Note: Admin commission will be paid when driver settles
   // For now, mark paidToAdmin as false (will be true after settlement)
   ride.paidToAdmin = false;
   ride.paymentDetails.adminCommissionAmount = roundedAdminCut;
   ride.adminCommissionAmount = roundedAdminCut;
   ride.updatePaymentStatus();
-  ride.status = "completed";
-  ride.completedAt = new Date();
+  
+  // For cash payments, keep status as "reachedDestination" (not completed yet)
+  // Ride will be marked as completed after driver settles with admin
+  // Don't set completedAt here - it will be set after settlement
   await ride.save();
 
   console.log("Cash payment processed - driver will settle with admin later");
 
-  return { success: true, transactionId: userToDriverTx._id, rideCompleted: true, needsSettlement: true };
+  return { success: true, transactionId: userToDriverTx._id, rideCompleted: false, needsSettlement: true };
 }
 
 // Driver settlement - driver pays admin for cash rides
@@ -290,11 +300,18 @@ async function driverSettlement(driverId, rideIds, paymentMethod, paymentDetails
     status: "completed"
   });
 
-  // Update all rides - mark as paid to admin
+  // Update all rides - mark as paid to admin and complete the rides
   for (const ride of rides) {
     ride.paidToAdmin = true;
     ride.transactionId = transaction._id;
     ride.updatePaymentStatus();
+    // Mark ride as completed after settlement
+    if (ride.paymentSuccessful) {
+      ride.status = "completed";
+      if (!ride.completedAt) {
+        ride.completedAt = new Date();
+      }
+    }
     await ride.save();
   }
 

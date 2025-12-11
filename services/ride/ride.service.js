@@ -13,7 +13,8 @@ module.exports = {
         pickupLocation,
         dropLocation,
         vehicleType,
-        paymentMethod
+        paymentMethod,
+        driverId  // Optional: specify driver ID for testing
       } = req.body;
 
       const riderId = req.user?._id;
@@ -46,19 +47,39 @@ module.exports = {
         status: "requested",
       });
 
-      const nearestDriver = await Driver.findOne({
-        isAvailable: true,
-        registrationStatus: "approved",
-        status: "active"
-      }).select("_id");
-
-      if (nearestDriver) {
-        ride.driver = nearestDriver._id;
-        await ride.save();
-        const ok = sendRideToDriver(nearestDriver._id.toString(), ride);
-        console.log("sendRideToDriver result:", ok);
+      // If driverId is provided, use that driver (for testing)
+      if (driverId) {
+        const specifiedDriver = await Driver.findOne({
+          _id: driverId,
+          isAvailable: true,
+          registrationStatus: "approved",
+          status: "active"
+        });
+        
+        if (specifiedDriver) {
+          ride.driver = specifiedDriver._id;
+          await ride.save();
+          const ok = sendRideToDriver(specifiedDriver._id.toString(), ride);
+          console.log("sendRideToDriver result:", ok);
+        } else {
+          console.log("Specified driver not available or not found");
+        }
       } else {
-        console.log("No available drivers to auto-assign");
+        // Auto-assign nearest available driver
+        const nearestDriver = await Driver.findOne({
+          isAvailable: true,
+          registrationStatus: "approved",
+          status: "active"
+        }).select("_id");
+
+        if (nearestDriver) {
+          ride.driver = nearestDriver._id;
+          await ride.save();
+          const ok = sendRideToDriver(nearestDriver._id.toString(), ride);
+          console.log("sendRideToDriver result:", ok);
+        } else {
+          console.log("No available drivers to auto-assign");
+        }
       }
 
       return res.json(responseData("RIDE_CREATED", { ride, fareBreakdown: fareData.breakdown }, req, true));
@@ -112,7 +133,7 @@ module.exports = {
 
     const ride = await Ride.findOne({
       rider: userId,
-      status: { $in: ["requested", "accepted", "arrived", "ongoing"] }
+      status: { $in: ["requested", "accepted", "arrived", "ongoing", "reachedDestination"] }
     });
 
     if (!ride) return res.json(responseData("NO_ACTIVE_RIDE", {}, req, true));
@@ -133,6 +154,10 @@ module.exports = {
 
     if (ride.status === "cancelled") {
       return res.json(responseData("RIDE_ALREADY_CANCELLED", {}, req, false));
+    }
+
+    if (ride.status === "reachedDestination") {
+      return res.json(responseData("CANNOT_CANCEL_RIDE_AT_DESTINATION", {}, req, false));
     }
 
     ride.status = "cancelled";

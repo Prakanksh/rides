@@ -63,6 +63,7 @@ const RideSchema = new mongoose.Schema(
         "accepted", 
         "arrived", 
         "ongoing", 
+        "reachedDestination",
         "completed", 
         "cancelled"
       ],
@@ -84,10 +85,57 @@ const RideSchema = new mongoose.Schema(
     otpForRideStart: { type: String, default: null },
 
     startedAt: { type: Date, default: null },
-    completedAt: { type: Date, default: null }
+    completedAt: { type: Date, default: null },
+
+    paidToDriver: {
+      type: Boolean,
+      default: false
+    },
+    paidToAdmin: {
+      type: Boolean,
+      default: false
+    },
+    paymentSuccessful: {
+      type: Boolean,
+      default: false
+    },
+    transactionId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "transactions",
+      default: null
+    },
+    driverReceivedAmount: {
+      type: Number,
+      default: 0
+    },
+    adminCommissionAmount: {
+      type: Number,
+      default: 0
+    },
+    paymentDetails: {
+      userPaidAmount: { type: Number, default: 0 },
+      driverReceivedAmount: { type: Number, default: 0 },
+      adminCommissionAmount: { type: Number, default: 0 },
+      paymentCompletedAt: { type: Date, default: null }
+    }
   },
   { timestamps: true, versionKey: false }
 );
+
+RideSchema.methods.updatePaymentStatus = function() {
+  if (this.paidToAdmin && this.paidToDriver) {
+    this.paymentSuccessful = true;
+    if (!this.paymentDetails.paymentCompletedAt) {
+      this.paymentDetails.paymentCompletedAt = new Date();
+    }
+  } else {
+    this.paymentSuccessful = false;
+    this.paymentDetails.paymentCompletedAt = null;
+  }
+  this.paymentDetails.userPaidAmount = Number(this.paymentDetails.userPaidAmount.toFixed(2));
+  this.paymentDetails.driverReceivedAmount = Number(this.paymentDetails.driverReceivedAmount.toFixed(2));
+  this.paymentDetails.adminCommissionAmount = Number(this.paymentDetails.adminCommissionAmount.toFixed(2));
+};
 
 RideSchema.index({ pickupLocation: "2dsphere" });
 RideSchema.index({ dropLocation: "2dsphere" });

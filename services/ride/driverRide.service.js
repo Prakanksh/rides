@@ -11,7 +11,7 @@ module.exports = {
   getAssignedRide: async (req, res) => {
     const ride = await Ride.findOne({
       driver: req.user._id,
-      status: { $in: ["requested", "accepted", "arrived", "ongoing"] }
+      status: { $in: ["requested", "accepted", "arrived", "ongoing", "reachedDestination"] }
     });
     return res.json(responseData("ASSIGNED_RIDE", { ride }, req, true));
   },
@@ -71,9 +71,9 @@ module.exports = {
     return res.json(responseData("RIDE_STARTED", { ride }, req, true));
   },
 
-  completeRide: async (req, res) => {
+  reachedDestination: async (req, res) => {
     try {
-      console.log("=== COMPLETE RIDE START ===");
+      console.log("=== REACHED DESTINATION START ===");
       console.log("rideId:", req.body.rideId);
       console.log("driverId from token:", req.user._id);
 
@@ -95,35 +95,36 @@ module.exports = {
       console.log("Payment method:", ride.paymentMethod);
       console.log("Rider ID:", ride.rider);
 
-      console.log("Creating wallets...");
-      await ensureWallets(ride.rider, req.user._id);
-      console.log("Wallets ensured");
-
-      let result;
-
-      if (ride.paymentMethod === "wallet") {
-        console.log("Processing wallet payment...");
-        result = await payByWallet(ride, ride.rider, req.user._id, finalFare);
-      } else {
-        console.log("Processing cash payment...");
-        result = await payByCash(ride, ride.rider, req.user._id, finalFare);
-      }
-
-      console.log("Payment result:", result);
-
-      if (!result.success) {
-        return res.json(responseData(result.message, {}, req, false));
-      }
-
-      ride.status = "completed";
-      ride.completedAt = new Date();
-      ride.finalFare = finalFare;
+      // Update ride status to reachedDestination
+      ride.status = "reachedDestination";
       await ride.save();
 
-      console.log("=== RIDE COMPLETED SUCCESSFULLY ===");
-      return res.json(responseData("RIDE_COMPLETED", { ride }, req, true));
+      // If payment method is wallet, process payment immediately
+      if (ride.paymentMethod === "wallet") {
+        console.log("Processing wallet payment...");
+        await ensureWallets(ride.rider, req.user._id);
+        
+        const result = await payByWallet(ride, ride.rider, req.user._id, finalFare);
+        
+        if (!result.success) {
+          return res.json(responseData(result.message, {}, req, false));
+        }
+
+        // Reload ride to get updated status
+        const updatedRide = await Ride.findById(ride._id);
+        
+        console.log("=== PAYMENT PROCESSED - RIDE COMPLETED ===");
+        
+        sendToUser(ride.rider.toString(), "user:rideCompleted", { ride: updatedRide });
+        return res.json(responseData("RIDE_COMPLETED", { ride: updatedRide }, req, true));
+      } else {
+        // For cash payment, just mark as reached destination
+        console.log("Cash payment - ride marked as reached destination");
+        sendToUser(ride.rider.toString(), "user:reachedDestination", { ride });
+        return res.json(responseData("REACHED_DESTINATION", { ride }, req, true));
+      }
     } catch (error) {
-      console.error("=== COMPLETE RIDE ERROR ===");
+      console.error("=== REACHED DESTINATION ERROR ===");
       console.error(error);
       return res.json(responseData(error.message || "SOMETHING_WENT_WRONG", {}, req, false));
     }
@@ -144,8 +145,8 @@ module.exports = {
       return res.json(responseData("RIDE_ALREADY_CANCELLED", {}, req, false));
     }
 
-    if (ride.status === "ongoing") {
-      return res.json(responseData("CANNOT_CANCEL_ONGOING_RIDE", {}, req, false));
+    if (ride.status === "ongoing" || ride.status === "reachedDestination") {
+      return res.json(responseData("CANNOT_CANCEL_RIDE_IN_PROGRESS", {}, req, false));
     }
 
     ride.cancelledDrivers.push(driverId);
