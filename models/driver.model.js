@@ -41,7 +41,10 @@ const DriverSchema = new mongoose.Schema(
       enum: ['pending', 'approved', 'rejected'],
       default: 'pending'
     },
-
+ isDeleted : {
+      type: Boolean,
+      default: false
+    },
     rejectionReason: {
       type: String,
       default: ''
@@ -50,6 +53,9 @@ const DriverSchema = new mongoose.Schema(
       type: String,
       enum: ['active', 'inactive'],
       default: 'inactive'
+    },role: {
+      type: String,
+      default: "driver"
     },
     isEmailVerified: { type: Boolean, default: false },
     isMobileVerified: { type: Boolean, default: false }

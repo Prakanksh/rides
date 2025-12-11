@@ -5,6 +5,6 @@ const driver= require('../../controllers/admins/driver.controller')
 
 router
   .post('/change-status', [verifyToken], driver.changeStatus)
- 
+   .put('/temp-delete',[verifyToken], driver.tempDelete)
 
 module.exports = router

@@ -58,4 +58,12 @@ module.exports = {
   //       return res.status(422).json(responseData(msg, {}, req))
   //     }   
   // }
+  tempDelete: async(req,res)=>{
+       try {
+        // console.log("ed")
+         await userService.tempDelete(req, res)
+       } catch (err) {
+         const msg = err.message || 'SOMETHING_WENT_WRONG'
+         return res.status(422).json(responseData(msg, {}, req))
+       }  }
 }
