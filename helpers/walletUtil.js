@@ -42,17 +42,18 @@ async function ensureWallets(userId, driverId) {
 
 async function payByWallet(ride, userId, driverId, finalFare) {
   const user = await User.findById(userId);
-  const driver = await Driver.findById(driverId);
   const admin = await Admin.findOne({});
 
-  if (!user || !driver || !admin) {
-    return { success: false, message: "USER_OR_DRIVER_OR_ADMIN_NOT_FOUND" };
+  if (!user || !admin) {
+    return { success: false, message: "USER_OR_ADMIN_NOT_FOUND" };
   }
 
-  const { adminCut, driverShare } = await computeShares(finalFare);
-  const roundedFinalFare = Number(finalFare.toFixed(2));
-  const roundedAdminCut = Number(adminCut.toFixed(2));
-  const roundedDriverShare = Number(driverShare.toFixed(2));
+  const fareToUse = finalFare > 0 ? finalFare : (ride.finalFare || ride.estimatedFare || 0);
+  if (fareToUse <= 0) {
+    return { success: false, message: "INVALID_FARE_AMOUNT" };
+  }
+
+  const roundedFinalFare = Number(fareToUse.toFixed(2));
 
   const userWalletBalance = Number((user.wallet || 0).toFixed(2));
   if (userWalletBalance < roundedFinalFare) {
@@ -62,23 +63,27 @@ async function payByWallet(ride, userId, driverId, finalFare) {
   user.wallet = Number((userWalletBalance - roundedFinalFare).toFixed(2));
   await user.save();
 
-  const currentDriverWallet = Number((driver.wallet || 0).toFixed(2));
-  driver.wallet = Number((currentDriverWallet + roundedDriverShare).toFixed(2));
-  await driver.save();
+  const { adminCut, driverShare } = await computeShares(roundedFinalFare);
+  const roundedAdminCut = Number(adminCut.toFixed(2));
+  const roundedDriverShare = Number(driverShare.toFixed(2));
 
-  let userToDriverTx;
+  const currentAdminCommission = Number((admin.commission || 0).toFixed(2));
+  admin.commission = Number((currentAdminCommission + roundedFinalFare).toFixed(2));
+  await admin.save();
+
+  let userToAdminTx;
   try {
-    userToDriverTx = await Transaction.create({
+    userToAdminTx = await Transaction.create({
       rideIds: [ride._id],
       paidBy: "user",
-      paidTo: "driver",
+      paidTo: "admin",
       paidById: userId,
-      paidToId: driverId,
+      paidToId: admin._id || null,
       paymentMethod: "wallet",
       paymentDetails: { walletTransactionId: `WLT-${Date.now()}-${ride._id}` },
       transactionType: "ride_payment",
       amount: roundedFinalFare,
-      commissionAmount: roundedDriverShare,
+      commissionAmount: 0,
       totalAmount: roundedFinalFare,
       status: "completed"
     });
@@ -87,40 +92,13 @@ async function payByWallet(ride, userId, driverId, finalFare) {
     return { success: false, message: "TRANSACTION_CREATION_FAILED", error: error.message };
   }
 
-  ride.paidToDriver = true;
-  ride.transactionId = userToDriverTx._id;
+  ride.paidToAdmin = true;
+  ride.paidToDriver = false;
+  ride.transactionId = userToAdminTx._id;
   if (!ride.paymentDetails) ride.paymentDetails = {};
   ride.paymentDetails.userPaidAmount = roundedFinalFare;
   ride.paymentDetails.driverReceivedAmount = roundedDriverShare;
   ride.driverReceivedAmount = roundedDriverShare;
-  await ride.save();
-
-  const currentAdminCommission = Number((admin.commission || 0).toFixed(2));
-  admin.commission = Number((currentAdminCommission + roundedAdminCut).toFixed(2));
-  await admin.save();
-
-  let adminCommissionTx;
-  try {
-    adminCommissionTx = await Transaction.create({
-      rideIds: [ride._id],
-      paidBy: "driver",
-      paidTo: "admin",
-      paidById: driverId,
-      paidToId: admin._id || null,
-      paymentMethod: "wallet",
-      transactionType: "admin_commission",
-      amount: roundedAdminCut,
-      commissionAmount: 0,
-      totalAmount: roundedAdminCut,
-      status: "completed"
-    });
-  } catch (error) {
-    console.error("Admin transaction creation failed:", error.message);
-    return { success: false, message: "ADMIN_TRANSACTION_CREATION_FAILED", error: error.message };
-  }
-
-  ride.paidToAdmin = true;
-  if (!ride.paymentDetails) ride.paymentDetails = {};
   ride.paymentDetails.adminCommissionAmount = roundedAdminCut;
   ride.adminCommissionAmount = roundedAdminCut;
   ride.updatePaymentStatus();
@@ -128,7 +106,7 @@ async function payByWallet(ride, userId, driverId, finalFare) {
   ride.completedAt = new Date();
   await ride.save();
 
-  return { success: true, transactionId: userToDriverTx._id, rideCompleted: true };
+  return { success: true, transactionId: userToAdminTx._id, rideCompleted: true };
 }
 
 async function payByCash(ride, userId, driverId, finalFare) {
