@@ -8,7 +8,8 @@ router.get("/assigned", verifyToken, rideController.getAssignedRide);
 router.post("/accept", verifyToken, rideController.acceptRide);
 router.post("/arrived", verifyToken, rideController.arrivedAtPickup);
 router.post("/start", verifyToken, rideController.startRide);
-router.post("/complete", verifyToken, rideController.completeRide);
+router.post("/reachedDestination", verifyToken, rideController.reachedDestination);
+router.post("/receivedPayment", verifyToken, rideController.receivedPayment);
 router.post("/cancel", verifyToken, rideController.cancelRide);
 
 module.exports = router;

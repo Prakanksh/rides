@@ -112,7 +112,11 @@ createRide: async (req, res) => {
         }
       }
     }).select("_id firstName lastName");
-
+  //  if (nearestDriver) {
+  //       ride.driver = nearestDriver._id;
+  //       await ride.save();
+  //       sendRideToDriver(nearestDriver._id.toString(), ride);
+  //     }
     if (nearbyDrivers.length > 0) {
       nearbyDrivers.forEach(driver => {
         sendRideToDriver(driver._id.toString(), ride);
@@ -176,7 +180,7 @@ createRide: async (req, res) => {
 
     const ride = await Ride.findOne({
       rider: userId,
-      status: { $in: ["requested", "accepted", "arrived", "ongoing"] }
+      status: { $in: ["requested", "accepted", "arrived", "ongoing", "reachedDestination"] }
     });
 
     if (!ride) return res.json(responseData("NO_ACTIVE_RIDE", {}, req, true));
@@ -197,6 +201,10 @@ createRide: async (req, res) => {
 
     if (ride.status === "cancelled") {
       return res.json(responseData("RIDE_ALREADY_CANCELLED", {}, req, false));
+    }
+
+    if (ride.status === "reachedDestination") {
+      return res.json(responseData("CANNOT_CANCEL_RIDE_AT_DESTINATION", {}, req, false));
     }
 
     ride.status = "cancelled";

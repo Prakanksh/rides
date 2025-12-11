@@ -25,7 +25,7 @@ Ride ID: <input id="rideId" />
 <input id="otpInput" placeholder="Enter OTP" />
 <br/><br/>
 
-<button onclick="completeRide()">Complete Ride</button>
+<button onclick="reachedDestination()">Reached Destination</button>
 
 <pre id="log"></pre>
 
@@ -58,7 +58,7 @@ function connectDriver() {
   socket.on("ride:accept:response", (d) => log("ACCEPT RESPONSE: " + JSON.stringify(d)));
   socket.on("ride:arrived:response", (d) => log("ARRIVED RESPONSE: " + JSON.stringify(d)));
   socket.on("ride:start:response", (d) => log("START RESPONSE: " + JSON.stringify(d)));
-  socket.on("ride:complete:response", (d) => log("COMPLETE RESPONSE: " + JSON.stringify(d)));
+  socket.on("ride:reachedDestination:response", (d) => log("REACHED DESTINATION RESPONSE: " + JSON.stringify(d)));
 }
 
 function goOnline() {
@@ -93,10 +93,10 @@ function startRide() {
   socket.emit("ride:start", { rideId, driverId, otp });
 }
 
-function completeRide() {
+function reachedDestination() {
   const driverId = document.getElementById("driverId").value;
   const rideId = document.getElementById("rideId").value;
-  socket.emit("ride:complete", { rideId, driverId });
+  socket.emit("ride:reachedDestination", { rideId, driverId });
 }
 </script>
 </body>

@@ -33,7 +33,7 @@ const DriverSchema = new mongoose.Schema(
       coordinates: { type: [Number], default: [0, 0] }
     },
     wallet: { type: Number, default: 0 },
-    commissionWallet: { type: Number, default: 0 },
+    driverCommission: { type: Number, default: 0 },
     isAvailable: { type: Boolean, default: true },
     // Registration flow
     registrationStatus: {
@@ -62,6 +62,16 @@ const DriverSchema = new mongoose.Schema(
   },
   { timestamps: true, versionKey: false }
 );
+
+DriverSchema.pre('save', function (next) {
+  if (this.wallet !== undefined && this.wallet !== null) {
+    this.wallet = Number(this.wallet.toFixed(2));
+  }
+  if (this.driverCommission !== undefined && this.driverCommission !== null) {
+    this.driverCommission = Number(this.driverCommission.toFixed(2));
+  }
+  next();
+});
 
 DriverSchema.index({ location: '2dsphere' });
 

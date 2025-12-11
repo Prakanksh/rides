@@ -56,6 +56,12 @@ function connectUser() {
     log("📍 Driver location: " + JSON.stringify(loc));
   });
 
+  // REACHED DESTINATION
+  socket.on("user:reachedDestination", (data) => {
+    log("📍 Reached Destination:");
+    log(JSON.stringify(data, null, 2));
+  });
+
   // RIDE COMPLETED
   socket.on("user:rideCompleted", (data) => {
     log("🏁 Ride Completed:");

@@ -80,6 +80,10 @@ const AdminSchema = new mongoose.Schema(
     isPasswordSet: {
       type: Boolean,
       default: false
+    },
+    commission: {
+      type: Number,
+      default: 0
     }
   },
   {
@@ -90,13 +94,24 @@ const AdminSchema = new mongoose.Schema(
 )
 
 AdminSchema.pre("save", function (next) {
-  mongoose
-    .model("admins")
-    .findOne({}).sort({ adminId: -1 })
-    .then((entry) => {
-      this.adminId = (parseInt(entry?.adminId) || 0) + 1
-      next();
-    });
+  // Round commission to 2 decimal places
+  if (this.commission !== undefined && this.commission !== null) {
+    this.commission = Number(this.commission.toFixed(2));
+  }
+  
+  // Only set adminId for new documents
+  if (this.isNew && !this.adminId) {
+    mongoose
+      .model("admins")
+      .findOne({}).sort({ adminId: -1 })
+      .then((entry) => {
+        this.adminId = (parseInt(entry?.adminId) || 0) + 1
+        next();
+      })
+      .catch((err) => next(err));
+  } else {
+    next();
+  }
 });
 
 const Admin = mongoose.model('admins', AdminSchema)
