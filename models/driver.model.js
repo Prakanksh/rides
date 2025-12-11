@@ -58,7 +58,6 @@ const DriverSchema = new mongoose.Schema(
 );
 
 DriverSchema.pre('save', function (next) {
-  // Round wallet and driverCommission to 2 decimal places
   if (this.wallet !== undefined && this.wallet !== null) {
     this.wallet = Number(this.wallet.toFixed(2));
   }

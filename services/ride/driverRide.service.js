@@ -1,7 +1,7 @@
 const Ride = require("../../models/ride.model");
 const Driver = require("../../models/driver.model");
 const { responseData } = require("../../helpers/responseData");
-const { ensureWallets, payByWallet, payByCash } = require("../../helpers/walletUtil");
+const { ensureWallets, payByWallet, payByCash, confirmCashPayment } = require("../../helpers/walletUtil");
 const { sendToUser, sendRideToDriver } = require("../../socket/emitRide");
 
 const genOtp = () => String(Math.floor(1000 + Math.random() * 9000));
@@ -88,22 +88,60 @@ module.exports = {
       await ride.save();
 
       await ensureWallets(ride.rider, req.user._id);
-      const result = ride.paymentMethod === "wallet" 
-        ? await payByWallet(ride, ride.rider, req.user._id, finalFare)
-        : await payByCash(ride, ride.rider, req.user._id, finalFare);
-        
+      
+      if (ride.paymentMethod === "wallet") {
+        const result = await payByWallet(ride, ride.rider, req.user._id, finalFare);
+        if (!result.success) {
+          return res.json(responseData(result.message, {}, req, false));
+        }
+        const updatedRide = await Ride.findById(ride._id);
+        sendToUser(ride.rider.toString(), "user:rideCompleted", { ride: updatedRide });
+        return res.json(responseData("RIDE_COMPLETED", { ride: updatedRide }, req, true));
+      } else {
+        const result = await payByCash(ride, ride.rider, req.user._id, finalFare);
+        if (!result.success) {
+          return res.json(responseData(result.message, {}, req, false));
+        }
+        const updatedRide = await Ride.findById(ride._id);
+        sendToUser(ride.rider.toString(), "user:rideCompleted", { ride: updatedRide });
+        return res.json(responseData("RIDE_COMPLETED", { ride: updatedRide }, req, true));
+      }
+    } catch (error) {
+      console.error("reachedDestination err", error);
+      return res.json(responseData(error.message || "SOMETHING_WENT_WRONG", {}, req, false));
+    }
+  },
+
+  receivedPayment: async (req, res) => {
+    try {
+      const ride = await Ride.findOne({
+        _id: req.body.rideId,
+        driver: req.user._id
+      });
+
+      if (!ride) return res.json(responseData("INVALID_RIDE", {}, req, false));
+      if (ride.status !== "reachedDestination" || ride.paymentMethod !== "cash") {
+        return res.json(responseData("INVALID_RIDE_STATE", {}, req, false));
+      }
+      if (ride.paidToDriver) {
+        return res.json(responseData("PAYMENT_ALREADY_CONFIRMED", {}, req, false));
+      }
+
+      const finalFare = ride.finalFare || ride.estimatedFare || 0;
+      if (finalFare <= 0) {
+        return res.json(responseData("INVALID_FARE_AMOUNT", {}, req, false));
+      }
+      const result = await confirmCashPayment(ride, ride.rider, req.user._id, finalFare);
+
       if (!result.success) {
         return res.json(responseData(result.message, {}, req, false));
       }
 
       const updatedRide = await Ride.findById(ride._id);
-      const eventName = ride.paymentMethod === "wallet" ? "user:rideCompleted" : "user:reachedDestination";
-      const message = ride.paymentMethod === "wallet" ? "RIDE_COMPLETED" : "REACHED_DESTINATION";
-      
-      sendToUser(ride.rider.toString(), eventName, { ride: updatedRide });
-      return res.json(responseData(message, { ride: updatedRide }, req, true));
+      sendToUser(ride.rider.toString(), "user:rideCompleted", { ride: updatedRide });
+      return res.json(responseData("PAYMENT_CONFIRMED", { ride: updatedRide }, req, true));
     } catch (error) {
-      console.error("reachedDestination err", error);
+      console.error("receivedPayment err", error);
       return res.json(responseData(error.message || "SOMETHING_WENT_WRONG", {}, req, false));
     }
   },

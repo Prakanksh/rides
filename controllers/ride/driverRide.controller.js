@@ -17,6 +17,9 @@ module.exports = {
   reachedDestination: async (req, res) => {
     try { await driverRideService.reachedDestination(req, res); } catch (err) { return res.json(responseData(err.message || "SOMETHING_WENT_WRONG", {}, req, false)); }
   },
+  receivedPayment: async (req, res) => {
+    try { await driverRideService.receivedPayment(req, res); } catch (err) { return res.json(responseData(err.message || "SOMETHING_WENT_WRONG", {}, req, false)); }
+  },
   cancelRide: async (req, res) => {
     try { await driverRideService.cancelRide(req, res); } catch (err) { return res.json(responseData(err.message || "SOMETHING_WENT_WRONG", {}, req, false)); }
   },

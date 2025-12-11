@@ -62,8 +62,8 @@ async function payByWallet(ride, userId, driverId, finalFare) {
   user.wallet = Number((userWalletBalance - roundedFinalFare).toFixed(2));
   await user.save();
 
-  const currentDriverCommission = Number((driver.driverCommission || 0).toFixed(2));
-  driver.driverCommission = Number((currentDriverCommission + roundedDriverShare).toFixed(2));
+  const currentDriverWallet = Number((driver.wallet || 0).toFixed(2));
+  driver.wallet = Number((currentDriverWallet + roundedDriverShare).toFixed(2));
   await driver.save();
 
   let userToDriverTx;
@@ -133,20 +133,36 @@ async function payByWallet(ride, userId, driverId, finalFare) {
 
 async function payByCash(ride, userId, driverId, finalFare) {
   const driver = await Driver.findById(driverId);
-  const admin = await Admin.findOne({});
-
-  if (!driver || !admin) {
-    return { success: false, message: "DRIVER_OR_ADMIN_NOT_FOUND" };
+  if (!driver) {
+    return { success: false, message: "DRIVER_NOT_FOUND" };
   }
 
-  const { adminCut, driverShare } = await computeShares(finalFare);
-  const roundedFinalFare = Number(finalFare.toFixed(2));
-  const roundedAdminCut = Number(adminCut.toFixed(2));
-  const roundedDriverShare = Number(driverShare.toFixed(2));
+  const fareToUse = finalFare > 0 ? finalFare : (ride.finalFare || ride.estimatedFare || 0);
+  if (fareToUse <= 0) {
+    return { success: false, message: "INVALID_FARE_AMOUNT" };
+  }
 
-  const currentDriverWallet = Number((driver.wallet || 0).toFixed(2));
-  driver.wallet = Number((currentDriverWallet + roundedFinalFare).toFixed(2));
-  await driver.save();
+  const { adminCut, driverShare } = await computeShares(fareToUse);
+  const roundedFinalFare = Number(fareToUse.toFixed(2));
+  const roundedAdminCut = Number(adminCut.toFixed(2));
+
+  const currentDriverCommission = Number((driver.driverCommission || 0).toFixed(2));
+  const newDriverCommission = Number((currentDriverCommission + roundedFinalFare).toFixed(2));
+  driver.driverCommission = newDriverCommission;
+  
+  try {
+    await driver.save();
+    const savedDriver = await Driver.findById(driverId);
+    if (!savedDriver) {
+      return { success: false, message: "DRIVER_NOT_FOUND_AFTER_SAVE" };
+    }
+    if (Math.abs(savedDriver.driverCommission - newDriverCommission) > 0.01) {
+      return { success: false, message: "DRIVER_COMMISSION_UPDATE_FAILED" };
+    }
+  } catch (error) {
+    console.error("Error saving driver commission:", error);
+    return { success: false, message: "DRIVER_COMMISSION_UPDATE_FAILED", error: error.message };
+  }
 
   let userToDriverTx;
   try {
@@ -157,10 +173,10 @@ async function payByCash(ride, userId, driverId, finalFare) {
       paidById: userId,
       paidToId: driverId,
       paymentMethod: "cash",
-      paymentDetails: { notes: "Cash payment received from user - driver will settle with admin later" },
+      paymentDetails: { notes: "Cash payment received from user" },
       transactionType: "ride_payment",
       amount: roundedFinalFare,
-      commissionAmount: roundedDriverShare,
+      commissionAmount: roundedFinalFare,
       totalAmount: roundedFinalFare,
       status: "completed"
     });
@@ -175,13 +191,78 @@ async function payByCash(ride, userId, driverId, finalFare) {
   ride.paymentDetails.userPaidAmount = roundedFinalFare;
   ride.paymentDetails.driverReceivedAmount = roundedFinalFare;
   ride.driverReceivedAmount = roundedFinalFare;
-  ride.paidToAdmin = false;
   ride.paymentDetails.adminCommissionAmount = roundedAdminCut;
   ride.adminCommissionAmount = roundedAdminCut;
   ride.updatePaymentStatus();
+  ride.status = "completed";
+  ride.completedAt = new Date();
   await ride.save();
 
-  return { success: true, transactionId: userToDriverTx._id, rideCompleted: false, needsSettlement: true };
+  return { success: true, transactionId: userToDriverTx._id, rideCompleted: true };
+}
+
+async function confirmCashPayment(ride, userId, driverId, finalFare) {
+  const driver = await Driver.findById(driverId);
+  if (!driver) {
+    return { success: false, message: "DRIVER_NOT_FOUND" };
+  }
+
+  const fareToUse = finalFare > 0 ? finalFare : (ride.finalFare || ride.estimatedFare || 0);
+  if (fareToUse <= 0) {
+    return { success: false, message: "INVALID_FARE_AMOUNT" };
+  }
+
+  const roundedFinalFare = Number(fareToUse.toFixed(2));
+
+  const currentDriverCommission = Number((driver.driverCommission || 0).toFixed(2));
+  const newDriverCommission = Number((currentDriverCommission + roundedFinalFare).toFixed(2));
+  driver.driverCommission = newDriverCommission;
+  
+  try {
+    await driver.save();
+    
+    const savedDriver = await Driver.findById(driverId);
+    if (!savedDriver || savedDriver.driverCommission !== newDriverCommission) {
+      console.error("Driver commission save verification failed");
+      return { success: false, message: "DRIVER_COMMISSION_UPDATE_FAILED" };
+    }
+  } catch (error) {
+    console.error("Error saving driver commission:", error);
+    return { success: false, message: "DRIVER_COMMISSION_UPDATE_FAILED", error: error.message };
+  }
+
+  let userToDriverTx;
+  try {
+    userToDriverTx = await Transaction.create({
+      rideIds: [ride._id],
+      paidBy: "user",
+      paidTo: "driver",
+      paidById: userId,
+      paidToId: driverId,
+      paymentMethod: "cash",
+      paymentDetails: { notes: "Cash payment received from user" },
+      transactionType: "ride_payment",
+      amount: roundedFinalFare,
+      commissionAmount: roundedFinalFare,
+      totalAmount: roundedFinalFare,
+      status: "completed"
+    });
+  } catch (error) {
+    console.error("Transaction creation failed:", error.message);
+    return { success: false, message: "TRANSACTION_CREATION_FAILED", error: error.message };
+  }
+
+  ride.paidToDriver = true;
+  ride.transactionId = userToDriverTx._id;
+  if (!ride.paymentDetails) ride.paymentDetails = {};
+  ride.paymentDetails.driverReceivedAmount = roundedFinalFare;
+  ride.driverReceivedAmount = roundedFinalFare;
+  ride.updatePaymentStatus();
+  ride.status = "completed";
+  ride.completedAt = new Date();
+  await ride.save();
+
+  return { success: true, transactionId: userToDriverTx._id, rideCompleted: true };
 }
 
 async function driverSettlement(driverId, rideIds, paymentMethod, paymentDetails) {
@@ -260,5 +341,6 @@ module.exports = {
   ensureWallets,
   payByWallet,
   payByCash,
+  confirmCashPayment,
   driverSettlement
 };
