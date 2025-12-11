@@ -13,8 +13,7 @@ module.exports = {
         pickupLocation,
         dropLocation,
         vehicleType,
-        paymentMethod,
-        driverId  // Optional: specify driver ID for testing
+        paymentMethod
       } = req.body;
 
       const riderId = req.user?._id;
@@ -47,39 +46,16 @@ module.exports = {
         status: "requested",
       });
 
-      // If driverId is provided, use that driver (for testing)
-      if (driverId) {
-        const specifiedDriver = await Driver.findOne({
-          _id: driverId,
-          isAvailable: true,
-          registrationStatus: "approved",
-          status: "active"
-        });
-        
-        if (specifiedDriver) {
-          ride.driver = specifiedDriver._id;
-          await ride.save();
-          const ok = sendRideToDriver(specifiedDriver._id.toString(), ride);
-          console.log("sendRideToDriver result:", ok);
-        } else {
-          console.log("Specified driver not available or not found");
-        }
-      } else {
-        // Auto-assign nearest available driver
-        const nearestDriver = await Driver.findOne({
-          isAvailable: true,
-          registrationStatus: "approved",
-          status: "active"
-        }).select("_id");
+      const nearestDriver = await Driver.findOne({
+        isAvailable: true,
+        registrationStatus: "approved",
+        status: "active"
+      }).select("_id");
 
-        if (nearestDriver) {
-          ride.driver = nearestDriver._id;
-          await ride.save();
-          const ok = sendRideToDriver(nearestDriver._id.toString(), ride);
-          console.log("sendRideToDriver result:", ok);
-        } else {
-          console.log("No available drivers to auto-assign");
-        }
+      if (nearestDriver) {
+        ride.driver = nearestDriver._id;
+        await ride.save();
+        sendRideToDriver(nearestDriver._id.toString(), ride);
       }
 
       return res.json(responseData("RIDE_CREATED", { ride, fareBreakdown: fareData.breakdown }, req, true));

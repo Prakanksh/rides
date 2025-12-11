@@ -102,6 +102,19 @@ module.exports = {
 
     return referralCode
   },
+  generateRandomAlphanumericId(length) {
+    const characters =
+      'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
+    const charactersLength = characters.length
+    let randomId = ''
+
+    for (let i = 0; i < length; i++) {
+      const randomIndex = crypto.randomInt(0, charactersLength)
+      randomId += characters.charAt(randomIndex)
+    }
+
+    return randomId
+  },
   generatePutPresignedUrl: async (
     bucketName,
     objectKey,

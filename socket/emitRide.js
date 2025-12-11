@@ -17,12 +17,9 @@ function initSocketIO(io) {
   ioInstance = io;
 
   io.on("connection", (socket) => {
-    console.log("🔌 Socket connected:", socket.id);
-
     socket.on("driver:online", (driverId) => {
       try {
         addDriverSocket(driverId, socket.id);
-        console.log("🟢 Driver", driverId, "online ->", socket.id);
         socket.join(`driver:${driverId}`);
         socket.emit("driver:online:ack", { ok: true });
       } catch (e) { console.error("driver:online err", e); }
@@ -31,7 +28,6 @@ function initSocketIO(io) {
     socket.on("user:connect", (userId) => {
       try {
         addUserSocket(userId, socket.id);
-        console.log("🟣 User", userId, "connected ->", socket.id);
         socket.join(`user:${userId}`);
         socket.emit("user:connect:ack", { ok: true });
       } catch (e) { console.error("user:connect err", e); }
@@ -127,76 +123,50 @@ function initSocketIO(io) {
 
     socket.on("ride:reachedDestination", async (payload) => {
       try {
-        console.log("=== SOCKET RIDE:REACHED_DESTINATION ===");
         const { rideId, driverId } = payload || {};
-        console.log("rideId:", rideId, "driverId:", driverId);
-        
         if (!rideId || !driverId) { 
           socket.emit("ride:reachedDestination:response", { success: false, message: "INVALID_PAYLOAD" }); 
           return; 
         }
 
         const ride = await Ride.findOne({ _id: rideId, driver: driverId });
-        console.log("Ride found:", ride ? "YES" : "NO");
-        
         if (!ride) { 
           socket.emit("ride:reachedDestination:response", { success: false, message: "INVALID_RIDE" }); 
           return; 
         }
         
         if (ride.status !== "ongoing") { 
-          console.log("Ride status is:", ride.status, "- expected 'ongoing'");
           socket.emit("ride:reachedDestination:response", { success: false, message: "RIDE_NOT_STARTED" }); 
           return; 
         }
 
         const finalFare = ride.finalFare || ride.estimatedFare;
-        console.log("Final fare:", finalFare);
-        console.log("Payment method:", ride.paymentMethod);
-
-        // Update ride status to reachedDestination
         ride.status = "reachedDestination";
         await ride.save();
 
-        // If payment method is wallet, process payment immediately
-        if (ride.paymentMethod === "wallet") {
-          console.log("Processing wallet payment...");
-          await ensureWallets(ride.rider, driverId);
+        await ensureWallets(ride.rider, driverId);
+        const result = ride.paymentMethod === "wallet" 
+          ? await payByWallet(ride, ride.rider, driverId, finalFare)
+          : await payByCash(ride, ride.rider, driverId, finalFare);
           
-          const result = await payByWallet(ride, ride.rider, driverId, finalFare);
-          
-          if (!result.success) {
-            socket.emit("ride:reachedDestination:response", { success: false, message: result.message });
-            return;
-          }
-
-          // Reload ride to get updated status
-          const updatedRide = await Ride.findById(ride._id);
-          
-          console.log("=== PAYMENT PROCESSED - RIDE COMPLETED ===");
-          
-          const riderSocket = getUserSocketId(ride.rider);
-          if (riderSocket && ioInstance) {
-            ioInstance.to(riderSocket).emit("user:rideCompleted", { ride: updatedRide });
-          } else {
-            ioInstance.to(`user:${ride.rider}`).emit("user:rideCompleted", { ride: updatedRide });
-          }
-
-          socket.emit("ride:reachedDestination:response", { success: true, ride: updatedRide });
-        } else {
-          // For cash payment, just mark as reached destination (payment will be handled later)
-          console.log("Cash payment - ride marked as reached destination");
-          const riderSocket = getUserSocketId(ride.rider);
-          if (riderSocket && ioInstance) {
-            ioInstance.to(riderSocket).emit("user:reachedDestination", { ride });
-          } else {
-            ioInstance.to(`user:${ride.rider}`).emit("user:reachedDestination", { ride });
-          }
-
-          socket.emit("ride:reachedDestination:response", { success: true, ride });
+        if (!result.success) {
+          socket.emit("ride:reachedDestination:response", { success: false, message: result.message });
+          return;
         }
+
+        const updatedRide = await Ride.findById(ride._id);
+        const riderSocket = getUserSocketId(ride.rider);
+        const eventName = ride.paymentMethod === "wallet" ? "user:rideCompleted" : "user:reachedDestination";
+        
+        if (riderSocket && ioInstance) {
+          ioInstance.to(riderSocket).emit(eventName, { ride: updatedRide });
+        } else {
+          ioInstance.to(`user:${ride.rider}`).emit(eventName, { ride: updatedRide });
+        }
+
+        socket.emit("ride:reachedDestination:response", { success: true, ride: updatedRide });
       } catch (e) { 
-        console.error("=== SOCKET RIDE:REACHED_DESTINATION ERROR ===", e); 
+        console.error("ride:reachedDestination err", e); 
         socket.emit("ride:reachedDestination:response", { success: false, message: "SERVER_ERROR" }); 
       }
     });

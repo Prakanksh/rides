@@ -147,7 +147,10 @@ const TransactionSchema = new mongoose.Schema(
 
 TransactionSchema.pre('validate', function (next) {
   if (!this.transactionId) {
-    this.transactionId = generateRandomAlphanumericId(10)
+    // Generate unique transactionId with timestamp to avoid collisions
+    const timestamp = Date.now();
+    const random = Math.floor(Math.random() * 10000).toString().padStart(4, "0");
+    this.transactionId = `TXN${timestamp}${random}`;
   }
   if (this.paidBy === "user" && this.paidById) {
     this.userId = this.paidById
