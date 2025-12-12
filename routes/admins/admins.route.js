@@ -15,5 +15,5 @@ router
   .put('/change-status/:id', [verifyToken], admin.changeStatus)
   .post('/generatePreSignedUrl', [verifyToken], admin.generatePresignedURL)
   .get('/country-list', [verifyToken], admin.countryList)
-  .get('/admin-dashboard', admin.getAdminDashboard)
+  .get('/dashboard', admin.getAdminDashboard)
 module.exports = router

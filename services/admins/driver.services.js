@@ -1,6 +1,7 @@
 
 const { responseData } = require("../../helpers/responseData");
 const driverModel = require("../../models/driver.model");
+const driverDocument = require("../../models/driverDocument");
 
 module.exports={
     changeStatus :async (req, res) => {
@@ -62,6 +63,62 @@ tempDelete: async (req, res) => {
     return res.json(
       responseData("ERROR_OCCUR", { error: error.message }, req, false)
     );
+  }
+},
+updateDocStatus: async (req, res) => {
+  try {
+    const { driverId, docType } = req.params;
+    const { status } = req.body;
+
+    // Validate document type
+    const validDocTypes = ['aadhar', 'pan', 'drivingLicence', 'rc'];
+    if (!validDocTypes.includes(docType)) {
+        return res.json(responseData("INVALID_DOCUMENT", {}, req, false));
+   
+    }
+
+  
+    const validStatuses = ['pending', 'approved', 'rejected'];
+    if (!status || !validStatuses.includes(status)) {
+              return res.json(responseData("INVALID_STATUS", {}, req, false));
+
+    }
+
+  
+    const driver = await driverDocument.findOne({driverId:driverId});
+ 
+  
+
+    // Check if document exists
+    if (!driver.documents || !driver.documents[docType]) {
+      return res.status(404).json({
+        success: false,
+        message: `${docType} document not found`
+      });
+    }
+
+    // Update the status
+    driver.documents[docType].status = status;
+    await driver.save();
+
+    return res.status(200).json({
+      success: true,
+      message: `${docType} status updated to ${status}`,
+      data: {
+        driverId: driver._id,
+        documentType: docType,
+        status: driver.documents[docType].status,
+        updatedAt: new Date()
+      }
+    });
+
+  } catch (error) {
+    console.error('Error updating document status:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: error.message
+    });
   }
 }
 }

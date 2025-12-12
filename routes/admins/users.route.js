@@ -12,6 +12,6 @@ router
   .put('/status-change/:id', [verifyToken], user.statusChange)
   // .put('/status-change/:id', [verifyToken], user.statusChange)
   .put('/temp-delete',[verifyToken], user.tempDelete)
-  .get('/getallusers', user.getAllUsers);
+  .get('/all-users', user.getAllUsers);
   // .get('/unused-aws-url',[verifyToken], user.awsUrl)
 module.exports = router

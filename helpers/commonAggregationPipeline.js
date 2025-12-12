@@ -730,7 +730,7 @@ getAdminDashboardPipeline: () => {
             $lookup: {
               from: "drivers",
               pipeline: [
-                { $match: { status: "active" } },
+                { $match: { status: "active", isDeleted: false  } },
                 { $count: "totalDrivers" }
               ],
               as: "driverCount"
@@ -782,75 +782,86 @@ getAdminDashboardPipeline: () => {
             }
           }
         ],
-        recentUsers: [
-          { $match: { role: "user", isDeleted: false } },
-          { $sort: { createdAt: -1 } },
-          { $limit: 5 },
-          {
-            $project: {
-              _id: 1,
-              fullName: 1,
-              mobile: 1,
-              email: 1,
-              createdAt: 1
+      
+        yearlyRevenue: [
+      {
+        $lookup: {
+          from: "rides",
+          pipeline: [
+            {
+              $group: {
+                _id: { $year: "$createdAt" },
+                totalRevenue: {
+                  $sum: "$paymentDetails.adminCommissionAmount"
+                }
+              }
+            },
+            { $sort: { "_id": -1 } } // latest year first
+          ],
+          as: "yearlyRevenue"
+        }
+      },
+      { $project: { yearlyRevenue: 1 } }
+    ],
+
+  
+revenueTrend: [
+  {
+    $lookup: {
+      from: "rides",
+      pipeline: [{$match: {status: "completed"}},
+        {
+          $group: {
+            _id: {
+              year: { $year: "$createdAt" },
+              month: { $month: "$createdAt" }
+            },
+            totalRevenue: {
+              $sum: "$paymentDetails.adminCommissionAmount"
             }
           }
-        ],
+        },
+        { $sort: { "_id.year": -1, "_id.month": 1 } },
 
-        recentDrivers: [
-          {
-            $lookup: {
-              from: "drivers",
-              pipeline: [
-                { $match: { status: "active" } },
-                { $sort: { createdAt: -1 } },
-                { $limit: 5 },
-                {
-                  $project: {
-                    _id: 1,
-                    firstName: 1,
-                    lastName: 1,
-                    mobile: 1,
-                    createdAt: 1
-                  }
-                }
-              ],
-              as: "recentDrivers"
-            }
-          },
-          { $project: { recentDrivers: 1 } }
-        ],
+        // Convert month number → month name
+        {
+          $project: {
+            _id: 0,
+            month: {
+              $switch: {
+                branches: [
+                  { case: { $eq: ["$_id.month", 1] }, then: "Jan" },
+                  { case: { $eq: ["$_id.month", 2] }, then: "Feb" },
+                  { case: { $eq: ["$_id.month", 3] }, then: "Mar" },
+                  { case: { $eq: ["$_id.month", 4] }, then: "Apr" },
+                  { case: { $eq: ["$_id.month", 5] }, then: "May" },
+                  { case: { $eq: ["$_id.month", 6] }, then: "Jun" },
+                  { case: { $eq: ["$_id.month", 7] }, then: "Jul" },
+                  { case: { $eq: ["$_id.month", 8] }, then: "Aug" },
+                  { case: { $eq: ["$_id.month", 9] }, then: "Sep" },
+                  { case: { $eq: ["$_id.month", 10] }, then: "Oct" },
+                  { case: { $eq: ["$_id.month", 11] }, then: "Nov" },
+                  { case: { $eq: ["$_id.month", 12] }, then: "Dec" }
+                ],
+                default: "Unknown"
+              }
+            },
+            totalRevenue: 1
+          }
+        }
+      ],
+      as: "revenueTrend"
+    }
+  },
+  { $project: { revenueTrend: 1 } }
+]
 
- 
-        recentRides: [
-          {
-            $lookup: {
-              from: "rides",
-              pipeline: [
-                { $sort: { createdAt: -1 } },
-                { $limit: 5 },
-                {
-                  $project: {
-                    _id: 1,
-                    rider: 1,
-                    driver: 1,
-                    finalFare: 1,
-                    status: 1,
-                    createdAt: 1
-                  }
-                }
-              ],
-              as: "recentRides"
-            }
-          },
-          { $project: { recentRides: 1 } }
-        ]
+
+// 
       }
     },
 
-    // ------------------------------------------------
-    // FINAL RESPONSE SHAPE
-    // ------------------------------------------------
+   
     {
       $project: {
         totalUsers: { $arrayElemAt: ["$users.totalUsers", 0] },
@@ -863,9 +874,13 @@ getAdminDashboardPipeline: () => {
           $arrayElemAt: ["$rides.totalDriverEarnings", 0]
         },
 
-        recentUsers: "$recentUsers",
-        recentDrivers: { $arrayElemAt: ["$recentDrivers.recentDrivers", 0] },
-        recentRides: { $arrayElemAt: ["$recentRides.recentRides", 0] }
+       
+          yearlyRevenue: { $arrayElemAt: ["$yearlyRevenue.yearlyRevenue", 0] },
+   
+revenueTrend: { 
+  $arrayElemAt: ["$revenueTrend.revenueTrend", 0] 
+}
+
       }
     }
   ];

@@ -987,5 +987,9 @@
   },
   "ADMIN_DASHBOARD_FETCHED":{
  "en": "dashboard data fetched successfully."
-  }
+  },
+  "NO_CHANGES_APPLIED":{
+ "en": "No changes applied."  },
+ "USER_SOFT_DELETED":{
+    "en": "User soft deleted successfully." }
 }

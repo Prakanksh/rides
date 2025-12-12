@@ -457,9 +457,7 @@ tempDelete: async (req, res) => {
       totalPages: 0
     };
   }
-}
+},
 
 }
-
-
 
