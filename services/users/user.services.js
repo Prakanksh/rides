@@ -133,6 +133,8 @@ module.exports = {
       res.json(responseData('ERROR_OCCUR', error.message, req, false))
     }
   },
+
+
   verifyOTP: async (req, res) => {
     try {
       console.log("📌 STEP — verifyOTP Incoming Body:", req.body);
