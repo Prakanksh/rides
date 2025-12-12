@@ -1,6 +1,7 @@
 const Ride = require("../../models/ride.model");
 const Driver = require("../../models/driver.model");
 const Vehicle = require("../../models/vehicle.model");
+const User = require("../../models/user.model");
 const { responseData } = require("../../helpers/responseData");
 const { ensureWallets, payByWallet, payByCash, confirmCashPayment } = require("../../helpers/walletUtil");
 const { sendToUser, sendRideToDriver } = require("../../socket/emitRide");
@@ -15,6 +16,63 @@ module.exports = {
       status: { $in: ["requested", "accepted", "arrived", "ongoing", "reachedDestination"] }
     });
     return res.json(responseData("ASSIGNED_RIDE", { ride }, req, true));
+  },
+
+  getAvailableRides: async (req, res) => {
+    try {
+      const driverId = req.user._id;
+      const driver = await Driver.findById(driverId);
+      if (!driver) {
+        return res.json(responseData("DRIVER_NOT_FOUND", {}, req, false));
+      }
+
+      if (!driver.isAvailable || driver.registrationStatus !== "approved" || driver.status !== "active") {
+        return res.json(responseData("DRIVER_NOT_AVAILABLE", {}, req, false));
+      }
+
+      const vehicle = await Vehicle.findOne({ 
+        driver: driverId, 
+        status: "active" 
+      });
+
+      if (!vehicle) {
+        return res.json(responseData("NO_ACTIVE_VEHICLE", {}, req, false));
+      }
+      const normalizedVehicleType = vehicle.type === "prime-sedan" ? "prime sedan" : vehicle.type;
+
+      const baseQuery = {
+        status: "requested",
+        vehicleType: normalizedVehicleType,
+        cancelledDrivers: { $ne: driverId }
+      };
+
+      let availableRides;
+      if (driver.location && driver.location.coordinates && driver.location.coordinates.length === 2) {
+        const [driverLng, driverLat] = driver.location.coordinates;
+        availableRides = await Ride.find({
+          ...baseQuery,
+          pickupLocation: {
+            $near: {
+              $geometry: {
+                type: "Point",
+                coordinates: [driverLng, driverLat]
+              },
+              $maxDistance: 5000 // 5km
+            }
+          }
+        })
+          .populate({ path: "rider", model: "users", select: "firstName lastName mobile email" })
+          .sort({ createdAt: -1 })
+          .limit(20);
+      } else {
+        return res.json(responseData("DRIVER_LOCATION_REQUIRED", { message: "Please add your location to fetch available rides" }, req, false));
+      }
+
+      return res.json(responseData("AVAILABLE_RIDES", { rides: availableRides, count: availableRides.length }, req, true));
+    } catch (error) {
+      console.error("getAvailableRides error:", error);
+      return res.json(responseData(error.message || "SOMETHING_WENT_WRONG", {}, req, false));
+    }
   },
 
   acceptRide: async (req, res) => {

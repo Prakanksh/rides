@@ -5,6 +5,9 @@ module.exports = {
   getAssignedRide: async (req, res) => {
     try { await driverRideService.getAssignedRide(req, res); } catch (err) { return res.json(responseData(err.message || "SOMETHING_WENT_WRONG", {}, req, false)); }
   },
+  getAvailableRides: async (req, res) => {
+    try { await driverRideService.getAvailableRides(req, res); } catch (err) { return res.json(responseData(err.message || "SOMETHING_WENT_WRONG", {}, req, false)); }
+  },
   acceptRide: async (req, res) => {
     try { await driverRideService.acceptRide(req, res); } catch (err) { return res.json(responseData(err.message || "SOMETHING_WENT_WRONG", {}, req, false)); }
   },
