@@ -1,5 +1,6 @@
 const Ride = require("../../models/ride.model");
 const Driver = require("../../models/driver.model");
+const Vehicle = require("../../models/vehicle.model");
 const { responseData } = require("../../helpers/responseData");
 const { ensureWallets, payByWallet, payByCash, confirmCashPayment } = require("../../helpers/walletUtil");
 const { sendToUser, sendRideToDriver } = require("../../socket/emitRide");
@@ -25,6 +26,9 @@ module.exports = {
     ride.driver = req.user._id;
     ride.status = "accepted";
     await ride.save();
+
+    // Set driver as unavailable when ride is accepted
+    await Driver.findByIdAndUpdate(req.user._id, { isAvailable: false });
 
     return res.json(responseData("RIDE_ACCEPTED", { ride }, req, true));
   },
@@ -171,11 +175,56 @@ module.exports = {
     ride.otpForRideStart = null;
     await ride.save();
 
+    // Set driver as available when ride is cancelled by driver
+    await Driver.findByIdAndUpdate(driverId, { isAvailable: true });
+
+    // Normalize vehicle type for matching (ride uses "prime sedan", vehicle uses "prime-sedan")
+    const normalizedVehicleType = ride.vehicleType === "prime sedan" ? "prime-sedan" : ride.vehicleType;
+    
+    // Find drivers with matching vehicle type
+    const vehiclesWithMatchingType = await Vehicle.find({
+      type: normalizedVehicleType,
+      status: "active"
+    }).select("driver").lean();
+    
+    const driverIdsWithMatchingVehicle = vehiclesWithMatchingType.map(v => v.driver);
+    
+    if (driverIdsWithMatchingVehicle.length === 0) {
+      sendToUser(ride.rider.toString(), "user:searchingDriver", { 
+        ride, 
+        message: "Your driver cancelled. Finding new driver..." 
+      });
+      return res.json(responseData("RIDE_SEARCHING_DRIVER", { ride, newDriverAssigned: false }, req, true));
+    }
+
+    const [pickupLng, pickupLat] = ride.pickupLocation.coordinates;
+    // Filter out cancelled drivers from matching vehicle drivers
+    const availableDriverIds = driverIdsWithMatchingVehicle.filter(
+      id => !ride.cancelledDrivers.some(cancelledId => String(cancelledId) === String(id))
+    );
+    
+    if (availableDriverIds.length === 0) {
+      sendToUser(ride.rider.toString(), "user:searchingDriver", { 
+        ride, 
+        message: "Your driver cancelled. Finding new driver..." 
+      });
+      return res.json(responseData("RIDE_SEARCHING_DRIVER", { ride, newDriverAssigned: false }, req, true));
+    }
+    
     const newDriver = await Driver.findOne({
-      _id: { $nin: ride.cancelledDrivers },
+      _id: { $in: availableDriverIds },
       isAvailable: true,
       registrationStatus: "approved",
-      status: "active"
+      status: "active",
+      location: {
+        $near: {
+          $geometry: {
+            type: "Point",
+            coordinates: [pickupLng, pickupLat]
+          },
+          $maxDistance: 5000
+        }
+      }
     }).select("_id");
 
     if (newDriver) {

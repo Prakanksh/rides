@@ -40,12 +40,24 @@ function log(msg) {
 
 function connectDriver() {
   const driverId = document.getElementById("driverId").value;
+  if (!driverId || driverId === "DRIVER_ID_HERE") {
+    log("❌ Please enter a valid Driver ID");
+    return;
+  }
+  
   socket = io("http://localhost:5678");
 
-  socket.on("connect", () => log("Socket connected: " + socket.id));
+  socket.on("connect", () => {
+    log("✅ Socket connected: " + socket.id);
+    // Automatically go online after connection
+    socket.emit("driver:online", driverId);
+    log("📤 Sent driver:online for driver: " + driverId);
+  });
 
-  socket.emit("driver:online", driverId);
-  log("Sent driver:online");
+  socket.on("driver:online:ack", (data) => {
+    log("✅ Driver online confirmed: " + JSON.stringify(data));
+    log("🎉 Driver is now ONLINE and ready to receive rides!");
+  });
 
   // Receive new ride request
   socket.on("ride:new", (ride) => {
@@ -59,11 +71,30 @@ function connectDriver() {
   socket.on("ride:arrived:response", (d) => log("ARRIVED RESPONSE: " + JSON.stringify(d)));
   socket.on("ride:start:response", (d) => log("START RESPONSE: " + JSON.stringify(d)));
   socket.on("ride:reachedDestination:response", (d) => log("REACHED DESTINATION RESPONSE: " + JSON.stringify(d)));
+  
+  socket.on("disconnect", () => {
+    log("❌ Socket disconnected");
+  });
+  
+  socket.on("connect_error", (error) => {
+    log("❌ Connection error: " + error.message);
+  });
 }
 
 function goOnline() {
   const driverId = document.getElementById("driverId").value;
+  if (!driverId || driverId === "DRIVER_ID_HERE") {
+    log("❌ Please enter a valid Driver ID");
+    return;
+  }
+  
+  if (!socket || !socket.connected) {
+    log("❌ Socket not connected. Please click 'Connect Driver' first.");
+    return;
+  }
+  
   socket.emit("driver:online", driverId);
+  log("📤 Sent driver:online for driver: " + driverId);
 }
 
 function sendLocation() {

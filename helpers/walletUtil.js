@@ -106,6 +106,11 @@ async function payByWallet(ride, userId, driverId, finalFare) {
   ride.completedAt = new Date();
   await ride.save();
 
+  // Set driver as available when ride is completed
+  if (driverId) {
+    await Driver.findByIdAndUpdate(driverId, { isAvailable: true });
+  }
+
   return { success: true, transactionId: userToAdminTx._id, rideCompleted: true };
 }
 
@@ -176,6 +181,11 @@ async function payByCash(ride, userId, driverId, finalFare) {
   ride.completedAt = new Date();
   await ride.save();
 
+  // Set driver as available when ride is completed
+  if (driverId) {
+    await Driver.findByIdAndUpdate(driverId, { isAvailable: true });
+  }
+
   return { success: true, transactionId: userToDriverTx._id, rideCompleted: true };
 }
 
@@ -239,6 +249,11 @@ async function confirmCashPayment(ride, userId, driverId, finalFare) {
   ride.status = "completed";
   ride.completedAt = new Date();
   await ride.save();
+
+  // Set driver as available when ride is completed
+  if (driverId) {
+    await Driver.findByIdAndUpdate(driverId, { isAvailable: true });
+  }
 
   return { success: true, transactionId: userToDriverTx._id, rideCompleted: true };
 }

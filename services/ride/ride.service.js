@@ -1,5 +1,6 @@
 const Ride = require("../../models/ride.model");
 const Driver = require("../../models/driver.model");
+const Vehicle = require("../../models/vehicle.model");
 const { responseData } = require("../../helpers/responseData");
 const { calculateDistanceInKm } = require("../../helpers/distance");
 const { calculateFare } = require("../../helpers/fareConfig");
@@ -98,7 +99,32 @@ createRide: async (req, res) => {
       status: "requested"
     });
 
+    // Normalize vehicle type for matching (ride uses "prime sedan", vehicle uses "prime-sedan")
+    const normalizedVehicleType = vehicleType === "prime sedan" ? "prime-sedan" : vehicleType;
+    
+    // Find drivers with matching vehicle type
+    const vehiclesWithMatchingType = await Vehicle.find({
+      type: normalizedVehicleType,
+      status: "active"
+    }).select("driver").lean();
+    
+    const driverIdsWithMatchingVehicle = vehiclesWithMatchingType.map(v => v.driver);
+    
+    console.log(`🔍 Found ${driverIdsWithMatchingVehicle.length} drivers with vehicle type ${normalizedVehicleType}`);
+    
+    if (driverIdsWithMatchingVehicle.length === 0) {
+      return res.json(
+        responseData(
+          "RIDE_CREATED",
+          { ride, nearbyDrivers: [], fareBreakdown: fareData.breakdown, message: "No drivers available with requested vehicle type" },
+          req,
+          true
+        )
+      );
+    }
+
     const nearbyDrivers = await Driver.find({
+      _id: { $in: driverIdsWithMatchingVehicle },
       isAvailable: true,
       registrationStatus: "approved",
       status: "active",
@@ -112,14 +138,14 @@ createRide: async (req, res) => {
         }
       }
     }).select("_id firstName lastName");
-  //  if (nearestDriver) {
-  //       ride.driver = nearestDriver._id;
-  //       await ride.save();
-  //       sendRideToDriver(nearestDriver._id.toString(), ride);
-  //     }
+    
+    console.log(`📍 Found ${nearbyDrivers.length} nearby drivers within 5km`);
+    
     if (nearbyDrivers.length > 0) {
       nearbyDrivers.forEach(driver => {
-        sendRideToDriver(driver._id.toString(), ride);
+        console.log(`📤 Attempting to send ride to driver ${driver._id}`);
+        const sent = sendRideToDriver(driver._id.toString(), ride);
+        console.log(`📤 Send result for driver ${driver._id}: ${sent}`);
       });
     }
 
@@ -213,7 +239,9 @@ createRide: async (req, res) => {
     ride.cancelledAt = new Date();
     await ride.save();
 
+    // Set driver as available when ride is cancelled by user
     if (ride.driver) {
+      await Driver.findByIdAndUpdate(ride.driver, { isAvailable: true });
       sendRideToDriver(ride.driver.toString(), { 
         event: "rideCancelled", 
         ride, 
