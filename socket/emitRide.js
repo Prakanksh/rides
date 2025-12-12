@@ -14,6 +14,7 @@ const {
 } = require("./driverSocketMap");
 
 function initSocketIO(io) {
+
   ioInstance = io;
 
   io.on("connection", (socket) => {
@@ -413,6 +414,7 @@ function initSocketIO(io) {
 function sendRideToDriver(driverId, rideData) {
   if (!ioInstance) { console.log("❌ ioInstance not initialized"); return false; }
   try {
+
     const socketId = getDriverSocketId(driverId);
     if (!socketId) { console.log(`⚠️ Driver ${driverId} offline`); return false; }
     console.log(`🚕 Sending ride to driver ${driverId} via ${socketId}`);

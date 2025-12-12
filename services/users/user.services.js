@@ -270,7 +270,6 @@ module.exports = {
         deviceType,
         deviceToken
       } = req.body
-
       // Check if type is provided
       if (!type) {
         return res.json(responseData('TYPE_NOT_EXITS', {}, req, false))
@@ -300,7 +299,9 @@ module.exports = {
           mobile,
           countryCode
         })
-        const handleMobileRes = await handleMobileCheck(mobileCheck, req, res)
+        console.log(mobileCheck,"mobileCheck")
+        const handleMobileRes =  handleMobileCheck(mobileCheck, req, res)
+        console.log(handleMobileRes)
         if (handleMobileRes) {
           return res.json(responseData(handleMobileRes, {}, req, false))
         }
@@ -1419,11 +1420,14 @@ const login = async (
       delete finalUserData['deviceType']
       delete finalUserData['deviceToken']
       finalUserData.role = 'user'
+    
       const token = generateAuthToken(finalUserData)
 
       // check password condition
       const isValidPassword = await bcrypt.compare(password, (userData?.password || ''))
+   
       if (!isValidPassword) {
+     
         return res.json(responseData('USER_INVALID_LOGIN', {}, req, false))
       }
       await User.findOneAndUpdate(

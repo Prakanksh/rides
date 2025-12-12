@@ -2,6 +2,7 @@ const { body, param } = require('express-validator')
 const { validatorMiddleware } = require('../../helpers/helper')
 
 module.exports.validate = (method) => {
+  
   switch (method) {
     case 'adminLogin': {
       return [

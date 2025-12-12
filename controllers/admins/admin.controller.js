@@ -3,6 +3,7 @@ const adminService = require('../../services/admins/admin.services')
 module.exports = {
   adminLogin: async (req, res) => {
     try {
+      // console.log("cons")
       await adminService.adminLogin(req, res)
     } catch (err) {
       const msg = err.message || 'SOMETHING_WENT_WRONG'

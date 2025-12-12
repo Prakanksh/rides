@@ -85,7 +85,7 @@ module.exports = {
           value: 'email'
         },
         {
-          label: 'No. of orders',
+          label: 'No. of orders', 
           value: 'orders'
         },
         {
@@ -342,6 +342,7 @@ module.exports = {
   statusChange: async (req, res) => {
     try {
       const { status } = req.body
+   
       const resp = await User.updateOne(
         { _id: req.params.id },
         { $set: { status } }
@@ -377,5 +378,53 @@ module.exports = {
     } catch (error) {
       return res.json(responseData('ERROR_OCCUR', error.message, req, false))
     }
+  },
+//   tempDelete: async(req,res)=>{
+
+
+//  try {
+//     const { id} = req.body;
+//     console.log(id,"edc")   
+//       // const resp = await User.updateOne(
+//       //   { _id: id },
+//       //   { $set: { isDeleted : true } }
+//       // )
+//       const resp = await User.findByIdAndUpdate({_id:id},{isDeleted:true},{new:true})
+//       console.log(resp)
+//       if (resp?.modifiedCount) {
+//         return res.json(responseData('STATUS_UPDATE', {}, req, true))
+//       } else {
+//         return res.json(responseData('ERROR_OCCUR', {}, req, false))
+//       }
+//     } catch (error) {
+//       return res.json(responseData('ERROR_OCCUR', error.message, req, false))
+//     }
+//   }
+tempDelete: async (req, res) => {
+  try {
+    const { id } = req.body;   
+ 
+    if (!id) {
+      return res.json(responseData("ID_REQUIRED", {}, req, false));
+    }
+
+ 
+    const resp = await User.updateOne(
+      { _id: id },
+      { $set: { isDeleted: true } }
+    );
+
+    if (resp.modifiedCount > 0) {
+      return res.json(responseData("USER_SOFT_DELETED", {}, req, true));
+    }
+
+    return res.json(responseData("NO_CHANGES_APPLIED", {}, req, false));
+
+  } catch (error) {
+    return res.json(
+      responseData("ERROR_OCCUR", { error: error.message }, req, false)
+    );
   }
+}
+
 }

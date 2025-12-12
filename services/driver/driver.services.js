@@ -63,7 +63,12 @@ module.exports = {
       if (!vehicleType || !vehicleNumber) {
         return res.json(responseData('VEHICLE_DETAILS_REQUIRED', {}, req, false));
       }
-
+if (!['two-wheeler', 'auto', 'mini', 'prime-sedan', 'suv'].includes(vehicleType)) {
+  return res.status(400).json({
+    success: false,
+    message: `Invalid vehicle type. Allowed types are:two-wheeler,auto,mini,prime-sedan,suv`
+  });
+}
       // Check existing driver
       const existing = await Driver.findOne({ mobile, countryCode });
       if (existing) {

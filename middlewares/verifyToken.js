@@ -50,7 +50,7 @@ const handleUserRole = (user, req, res, next) => {
 
 const handleVerification = async (req, res, next, token) => {
   try {
-    const user = await jwt.verify(token, process.env.JWT_SECRET)
+    const user =  jwt.verify(token, process.env.JWT_SECRET)
     if (!user) {
       return res
         .status(401)
