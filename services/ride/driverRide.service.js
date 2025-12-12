@@ -1,5 +1,7 @@
 const Ride = require("../../models/ride.model");
 const Driver = require("../../models/driver.model");
+const Vehicle = require("../../models/vehicle.model");
+const User = require("../../models/user.model");
 const { responseData } = require("../../helpers/responseData");
 const { ensureWallets, payByWallet, payByCash, confirmCashPayment } = require("../../helpers/walletUtil");
 const { sendToUser, sendRideToDriver } = require("../../socket/emitRide");
@@ -16,6 +18,63 @@ module.exports = {
     return res.json(responseData("ASSIGNED_RIDE", { ride }, req, true));
   },
 
+  getAvailableRides: async (req, res) => {
+    try {
+      const driverId = req.user._id;
+      const driver = await Driver.findById(driverId);
+      if (!driver) {
+        return res.json(responseData("DRIVER_NOT_FOUND", {}, req, false));
+      }
+
+      if (!driver.isAvailable || driver.registrationStatus !== "approved" || driver.status !== "active") {
+        return res.json(responseData("DRIVER_NOT_AVAILABLE", {}, req, false));
+      }
+
+      const vehicle = await Vehicle.findOne({ 
+        driver: driverId, 
+        status: "active" 
+      });
+
+      if (!vehicle) {
+        return res.json(responseData("NO_ACTIVE_VEHICLE", {}, req, false));
+      }
+      const normalizedVehicleType = vehicle.type === "prime-sedan" ? "prime sedan" : vehicle.type;
+
+      const baseQuery = {
+        status: "requested",
+        vehicleType: normalizedVehicleType,
+        cancelledDrivers: { $ne: driverId }
+      };
+
+      let availableRides;
+      if (driver.location && driver.location.coordinates && driver.location.coordinates.length === 2) {
+        const [driverLng, driverLat] = driver.location.coordinates;
+        availableRides = await Ride.find({
+          ...baseQuery,
+          pickupLocation: {
+            $near: {
+              $geometry: {
+                type: "Point",
+                coordinates: [driverLng, driverLat]
+              },
+              $maxDistance: 5000 // 5km
+            }
+          }
+        })
+          .populate({ path: "rider", model: "users", select: "firstName lastName mobile email" })
+          .sort({ createdAt: -1 })
+          .limit(20);
+      } else {
+        return res.json(responseData("DRIVER_LOCATION_REQUIRED", { message: "Please add your location to fetch available rides" }, req, false));
+      }
+
+      return res.json(responseData("AVAILABLE_RIDES", { rides: availableRides, count: availableRides.length }, req, true));
+    } catch (error) {
+      console.error("getAvailableRides error:", error);
+      return res.json(responseData(error.message || "SOMETHING_WENT_WRONG", {}, req, false));
+    }
+  },
+
   acceptRide: async (req, res) => {
     const ride = await Ride.findById(req.body.rideId);
     if (!ride) return res.json(responseData("RIDE_NOT_FOUND", {}, req, false));
@@ -24,9 +83,17 @@ module.exports = {
 
     ride.driver = req.user._id;
     ride.status = "accepted";
+    
+    const otp = genOtp();
+    ride.otpForRideStart = otp;
     await ride.save();
 
-    return res.json(responseData("RIDE_ACCEPTED", { ride }, req, true));
+    // Set driver as unavailable when ride is accepted
+    await Driver.findByIdAndUpdate(req.user._id, { isAvailable: false });
+
+    sendToUser(ride.rider.toString(), "user:rideAccepted", { ride, event: "rideAccepted", otp });
+
+    return res.json(responseData("RIDE_ACCEPTED", { ride, otp }, req, true));
   },
 
   arrivedAtPickup: async (req, res) => {
@@ -40,12 +107,13 @@ module.exports = {
       return res.json(responseData("RIDE_NOT_IN_ACCEPTED_STATE", {}, req, false));
 
     ride.status = "arrived";
-    ride.otpForRideStart = genOtp();
     ride.updatedAt = new Date();
     await ride.save();
 
+    sendToUser(ride.rider.toString(), "user:driverArrived", { rideId: ride._id, event: "driverArrived" });
+
     return res.json(
-      responseData("DRIVER_ARRIVED", { ride, otpForTesting: ride.otpForRideStart }, req, true)
+      responseData("DRIVER_ARRIVED", { ride }, req, true)
     );
   },
 
@@ -171,11 +239,56 @@ module.exports = {
     ride.otpForRideStart = null;
     await ride.save();
 
+    // Set driver as available when ride is cancelled by driver
+    await Driver.findByIdAndUpdate(driverId, { isAvailable: true });
+
+    // Normalize vehicle type for matching (ride uses "prime sedan", vehicle uses "prime-sedan")
+    const normalizedVehicleType = ride.vehicleType === "prime sedan" ? "prime-sedan" : ride.vehicleType;
+    
+    // Find drivers with matching vehicle type
+    const vehiclesWithMatchingType = await Vehicle.find({
+      type: normalizedVehicleType,
+      status: "active"
+    }).select("driver").lean();
+    
+    const driverIdsWithMatchingVehicle = vehiclesWithMatchingType.map(v => v.driver);
+    
+    if (driverIdsWithMatchingVehicle.length === 0) {
+      sendToUser(ride.rider.toString(), "user:searchingDriver", { 
+        ride, 
+        message: "Your driver cancelled. Finding new driver..." 
+      });
+      return res.json(responseData("RIDE_SEARCHING_DRIVER", { ride, newDriverAssigned: false }, req, true));
+    }
+
+    const [pickupLng, pickupLat] = ride.pickupLocation.coordinates;
+    // Filter out cancelled drivers from matching vehicle drivers
+    const availableDriverIds = driverIdsWithMatchingVehicle.filter(
+      id => !ride.cancelledDrivers.some(cancelledId => String(cancelledId) === String(id))
+    );
+    
+    if (availableDriverIds.length === 0) {
+      sendToUser(ride.rider.toString(), "user:searchingDriver", { 
+        ride, 
+        message: "Your driver cancelled. Finding new driver..." 
+      });
+      return res.json(responseData("RIDE_SEARCHING_DRIVER", { ride, newDriverAssigned: false }, req, true));
+    }
+    
     const newDriver = await Driver.findOne({
-      _id: { $nin: ride.cancelledDrivers },
+      _id: { $in: availableDriverIds },
       isAvailable: true,
       registrationStatus: "approved",
-      status: "active"
+      status: "active",
+      location: {
+        $near: {
+          $geometry: {
+            type: "Point",
+            coordinates: [pickupLng, pickupLat]
+          },
+          $maxDistance: 5000
+        }
+      }
     }).select("_id");
 
     if (newDriver) {

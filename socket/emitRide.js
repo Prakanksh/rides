@@ -1,5 +1,6 @@
 const Ride = require("../models/ride.model");
 const Driver = require("../models/driver.model");
+const Vehicle = require("../models/vehicle.model");
 const { ensureWallets, payByWallet, payByCash, confirmCashPayment } = require("../helpers/walletUtil");
 let ioInstance = null;
 
@@ -64,18 +65,44 @@ function initSocketIO(io) {
           socket.emit("ride:accept:response", { success: false, message: "INVALID_PAYLOAD" });
           return;
         }
-        const ride = await Ride.findById(rideId);
-        if (!ride) { socket.emit("ride:accept:response", { success: false, message: "RIDE_NOT_FOUND" }); return; }
-        if (ride.status !== "requested" && String(ride.driver) !== String(driverId)) {
-          socket.emit("ride:accept:response", { success: false, message: "RIDE_UNAVAILABLE" }); return;
+        const otp = String(Math.floor(1000 + Math.random() * 9000));
+        
+        // Use atomic update to prevent race condition - only update if status is "requested" and driver is null
+        const ride = await Ride.findOneAndUpdate(
+          { 
+            _id: rideId, 
+            status: "requested",
+            driver: null
+          },
+          { 
+            driver: driverId,
+            status: "accepted",
+            otpForRideStart: otp,
+            updatedAt: new Date()
+          },
+          { new: true }
+        );
+        
+        if (!ride) { 
+          // Check if ride exists but was already accepted
+          const existingRide = await Ride.findById(rideId);
+          if (!existingRide) {
+            socket.emit("ride:accept:response", { success: false, message: "RIDE_NOT_FOUND" });
+          } else if (existingRide.status !== "requested") {
+            socket.emit("ride:accept:response", { success: false, message: "RIDE_ALREADY_ACCEPTED" });
+          } else if (existingRide.driver && String(existingRide.driver) !== String(driverId)) {
+            socket.emit("ride:accept:response", { success: false, message: "RIDE_ALREADY_ASSIGNED" });
+          } else {
+            socket.emit("ride:accept:response", { success: false, message: "RIDE_UNAVAILABLE" });
+          }
+          return; 
         }
-        ride.driver = driverId;
-        ride.status = "accepted";
-        ride.updatedAt = new Date();
-        await ride.save();
+
+        // Set driver as unavailable when ride is accepted
+        await Driver.findByIdAndUpdate(driverId, { isAvailable: false });
 
         const riderSocket = getUserSocketId(ride.rider);
-        const payloadToUser = { ride, event: "rideAccepted" };
+        const payloadToUser = { ride, event: "rideAccepted", otp };
         if (riderSocket && ioInstance) ioInstance.to(riderSocket).emit("user:rideAccepted", payloadToUser);
         else ioInstance.to(`user:${ride.rider}`).emit("user:rideAccepted", payloadToUser);
 
@@ -91,11 +118,10 @@ function initSocketIO(io) {
         if (!ride) { socket.emit("ride:arrived:response", { success:false, message:"INVALID_RIDE" }); return; }
         if (ride.status !== "accepted") { socket.emit("ride:arrived:response", { success:false, message:"RIDE_NOT_IN_ACCEPTED_STATE"}); return; }
 
-        const otp = String(Math.floor(1000 + Math.random() * 9000));
-        ride.status="arrived"; ride.otpForRideStart = otp; ride.updatedAt = new Date(); await ride.save();
+        ride.status="arrived"; ride.updatedAt = new Date(); await ride.save();
 
         const riderSocket = getUserSocketId(ride.rider);
-        const dataForUser = { rideId: ride._id, event: "driverArrived", otp };
+        const dataForUser = { rideId: ride._id, event: "driverArrived" };
         if (riderSocket && ioInstance) ioInstance.to(riderSocket).emit("user:driverArrived", dataForUser);
         else ioInstance.to(`user:${ride.rider}`).emit("user:driverArrived", dataForUser);
 
@@ -317,7 +343,9 @@ function initSocketIO(io) {
         ride.cancelledAt = new Date();
         await ride.save();
 
+        // Set driver as available when ride is cancelled
         if (ride.driver) {
+          await Driver.findByIdAndUpdate(ride.driver, { isAvailable: true });
           const driverSocket = getDriverSocketId(ride.driver);
           if (driverSocket && ioInstance) {
             ioInstance.to(driverSocket).emit("driver:rideCancelled", { ride, cancelledBy: "user" });
@@ -361,11 +389,51 @@ function initSocketIO(io) {
         ride.otpForRideStart = null;
         await ride.save();
 
+        // Set driver as available when ride is cancelled by driver
+        await Driver.findByIdAndUpdate(driverId, { isAvailable: true });
+
+        // Normalize vehicle type for matching (ride uses "prime sedan", vehicle uses "prime-sedan")
+        const normalizedVehicleType = ride.vehicleType === "prime sedan" ? "prime-sedan" : ride.vehicleType;
+        
+        // Find drivers with matching vehicle type
+        const vehiclesWithMatchingType = await Vehicle.find({
+          type: normalizedVehicleType,
+          status: "active"
+        }).select("driver").lean();
+        
+        const driverIdsWithMatchingVehicle = vehiclesWithMatchingType.map(v => v.driver);
+        
+        const [pickupLng, pickupLat] = ride.pickupLocation.coordinates;
+        // Filter out cancelled drivers from matching vehicle drivers
+        const availableDriverIds = driverIdsWithMatchingVehicle.filter(
+          id => !ride.cancelledDrivers.some(cancelledId => String(cancelledId) === String(id))
+        );
+        
+        if (availableDriverIds.length === 0) {
+          const riderSocket = getUserSocketId(ride.rider);
+          if (riderSocket && ioInstance) {
+            ioInstance.to(riderSocket).emit("user:searchingDriver", { ride, message: "Your driver cancelled. Finding new driver..." });
+          } else {
+            ioInstance.to(`user:${ride.rider}`).emit("user:searchingDriver", { ride, message: "Your driver cancelled. Finding new driver..." });
+          }
+          socket.emit("ride:cancel:response", { success: true, ride, newDriverAssigned: false });
+          return;
+        }
+        
         const newDriver = await Driver.findOne({
-          _id: { $nin: ride.cancelledDrivers },
+          _id: { $in: availableDriverIds },
           isAvailable: true,
           registrationStatus: "approved",
-          status: "active"
+          status: "active",
+          location: {
+            $near: {
+              $geometry: {
+                type: "Point",
+                coordinates: [pickupLng, pickupLat]
+              },
+              $maxDistance: 5000
+            }
+          }
         }).select("_id");
 
         if (newDriver) {
@@ -414,10 +482,13 @@ function initSocketIO(io) {
 function sendRideToDriver(driverId, rideData) {
   if (!ioInstance) { console.log("❌ ioInstance not initialized"); return false; }
   try {
-
     const socketId = getDriverSocketId(driverId);
-    if (!socketId) { console.log(`⚠️ Driver ${driverId} offline`); return false; }
-    console.log(`🚕 Sending ride to driver ${driverId} via ${socketId}`);
+    if (!socketId) { 
+      console.log(`⚠️ Driver ${driverId} offline - not in socket map`); 
+      return false; 
+    }
+    console.log(`🚕 Sending ride to driver ${driverId} via socket ${socketId}`);
+    // Emit only to socketId to avoid duplicate messages (driver is also in the room)
     ioInstance.to(socketId).emit("ride:new", rideData);
     return true;
   } catch (e) { console.error("sendRideToDriver err", e); return false; }
