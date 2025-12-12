@@ -783,28 +783,57 @@ getAdminDashboardPipeline: () => {
           }
         ],
       
-        yearlyRevenue: [
-      {
-        $lookup: {
-          from: "rides",
-          pipeline: [
-            {
-              $group: {
-                _id: { $year: "$createdAt" },
-                totalRevenue: {
-                  $sum: "$paymentDetails.adminCommissionAmount"
-                }
-              }
-            },
-            { $sort: { "_id": -1 } } // latest year first
-          ],
-          as: "yearlyRevenue"
-        }
-      },
-      { $project: { yearlyRevenue: 1 } }
-    ],
+    //     yearlyRevenue: [
+    //   {
+    //     $lookup: {
+    //       from: "rides",
+    //       pipeline: [
+    //         {
+    //           $group: {
+    //             _id: { $year: "$createdAt" },
+    //             totalRevenue: {
+    //               $sum: "$paymentDetails.adminCommissionAmount"
+    //             }
+    //           }
+    //         },
+    //         { $sort: { "_id": -1 } } // latest year first
+    //       ],
+    //       as: "yearlyRevenue"
+    //     }
+    //   },
+    //   { $project: { yearlyRevenue: 1 } }
+    // ],
 
-  
+  yearlyRevenue: [
+  {
+    $lookup: {
+      from: "rides",
+      pipeline: [
+        {
+          $group: {
+            _id: null,
+            totalRevenue: {
+              $sum: "$paymentDetails.adminCommissionAmount"
+            }
+          }
+        }
+      ],
+      as: "yearlyRevenue"
+    }
+  },
+  {
+    $project: {
+      _id: 0,
+      yearlyRevenue: {
+        $ifNull: [
+          { $arrayElemAt: ["$yearlyRevenue.totalRevenue", 0] },
+          0
+        ]
+      }
+    }
+  }
+],
+
 revenueTrend: [
   {
     $lookup: {
@@ -823,7 +852,7 @@ revenueTrend: [
         },
         { $sort: { "_id.year": -1, "_id.month": 1 } },
 
-        // Convert month number → month name
+      
         {
           $project: {
             _id: 0,
@@ -854,8 +883,158 @@ revenueTrend: [
     }
   },
   { $project: { revenueTrend: 1 } }
-]
+],
 
+earnings: [
+  {
+    $lookup: {
+      from: "transactions",
+      pipeline: [{$match: {status: "completed"}},
+        {
+          $group: {
+            _id: null,
+            paidToAdmin: {
+              $sum: {
+                $cond: [{ $eq: ["$paidTo", "admin"] }, "$amount", 0]
+              }
+            },
+            paidByAdmin: {
+              $sum: {
+                $cond: [{ $eq: ["$paidBy", "admin"] }, "$amount", 0]
+              }
+            }
+          }
+        },
+        {
+          $project: {
+            _id: 0,
+            totalEarnings: { $subtract: ["$paidToAdmin", "$paidByAdmin"] }
+          }
+        }
+      ],
+      as: "earningsSummary"
+    }
+  },
+  {
+    $project: {
+      totalEarnings: { $arrayElemAt: ["$earningsSummary.totalEarnings", 0] }
+    }
+  }
+],
+
+// yearlyEarnings: [
+//   {
+//     $lookup: {
+//       from: "transactions",
+//       pipeline: [
+//         { $match: { status: "completed" } },
+//         {
+//           $group: {
+//             _id: { $year: "$createdAt" },
+//             totalIncome: {
+//               $sum: {
+//                 $subtract: [
+//                   { $cond: [{ $eq: ["$paidTo", "admin"] }, "$amount", 0] },
+//                   { $cond: [{ $eq: ["$paidBy", "admin"] }, "$amount", 0] }
+//                 ]
+//               }
+//             }
+//           }
+//         },
+//         { $sort: { "_id": -1 } }
+//       ],
+//       as: "yearlyEarnings"
+//     }
+//   },
+//   { $project: { yearlyEarnings: 1 ,_id:0} }
+// ],
+yearlyEarnings: [
+  {
+    $lookup: {
+      from: "transactions",
+      pipeline: [
+        { $match: { status: "completed" } },
+        {
+          $group: {
+            _id: null,   // ❗ Single bucket → single value
+            totalIncome: {
+              $sum: {
+                $subtract: [
+                  { $cond: [{ $eq: ["$paidTo", "admin"] }, "$amount", 0] },
+                  { $cond: [{ $eq: ["$paidBy", "admin"] }, "$amount", 0] }
+                ]
+              }
+            }
+          }
+        }
+      ],
+      as: "yearlyEarnings"
+    }
+  },
+  {
+    // ❗ Extract single number instead of array
+    $project: {
+      _id: 0,
+      yearlyEarnings: { $ifNull: [{ $arrayElemAt: ["$yearlyEarnings.totalIncome", 0] }, 0] }
+    }
+  }
+],
+
+monthlyEarnings: [
+  {
+    $lookup: {
+      from: "transactions",
+      pipeline: [
+        { $match: { status: "completed" } },
+        {
+          $group: {
+            _id: {
+              year: { $year: "$createdAt" },
+              month: { $month: "$createdAt" }
+            },
+            totalEarnings: {
+              $sum: {
+                $subtract: [
+                  { $cond: [{ $eq: ["$paidTo", "admin"] }, "$amount", 0] },
+                  { $cond: [{ $eq: ["$paidBy", "admin"] }, "$amount", 0] }
+                ]
+              }
+            }
+          }
+        },
+        { $sort: { "_id.year": -1, "_id.month": -1 } },
+        {
+          $project: {
+            _id: 0,
+            // year: "$_id.year",
+            month: {
+              $switch: {
+                branches: [
+                  { case: { $eq: ["$_id.month", 1] }, then: "Jan" },
+                  { case: { $eq: ["$_id.month", 2] }, then: "Feb" },
+                  { case: { $eq: ["$_id.month", 3] }, then: "Mar" },
+                  { case: { $eq: ["$_id.month", 4] }, then: "Apr" },
+                  { case: { $eq: ["$_id.month", 5] }, then: "May" },
+                  { case: { $eq: ["$_id.month", 6] }, then: "Jun" },
+                  { case: { $eq: ["$_id.month", 7] }, then: "Jul" },
+                  { case: { $eq: ["$_id.month", 8] }, then: "Aug" },
+                  { case: { $eq: ["$_id.month", 9] }, then: "Sep" },
+                  { case: { $eq: ["$_id.month", 10] }, then: "Oct" },
+                  { case: { $eq: ["$_id.month", 11] }, then: "Nov" },
+                  { case: { $eq: ["$_id.month", 12] }, then: "Dec" }
+                ],
+                default: "Unknown"
+              }
+            },
+            totalEarnings: 1
+          }
+        }
+      ],
+      as: "monthlyEarnings"
+    }
+  },
+  { $project: { monthlyEarnings: 1 } }
+]
 
 // 
       }
@@ -868,18 +1047,23 @@ revenueTrend: [
         totalDrivers: { $arrayElemAt: ["$drivers.totalDrivers", 0] },
 
         totalRides: { $arrayElemAt: ["$rides.totalRides", 0] },
-        cancelledRides: { $arrayElemAt: ["$rides.cancelledRides", 0] },
+        // cancelledRides: { $arrayElemAt: ["$rides.cancelledRides", 0] },
         totalRevenue: { $arrayElemAt: ["$rides.totalRevenue", 0] },
-        totalDriverEarnings: {
-          $arrayElemAt: ["$rides.totalDriverEarnings", 0]
-        },
+        // totalDriverEarnings: {
+        //   $arrayElemAt: ["$rides.totalDriverEarnings", 0]
+        // },
 
        
           yearlyRevenue: { $arrayElemAt: ["$yearlyRevenue.yearlyRevenue", 0] },
    
 revenueTrend: { 
   $arrayElemAt: ["$revenueTrend.revenueTrend", 0] 
-}
+},  
+  totalEarnings: { $arrayElemAt: ["$earnings.totalEarnings", 0] },
+   yearlyEarnings: { $arrayElemAt: ["$yearlyEarnings.yearlyEarnings", 0] },
+    monthlyEarnings: { $arrayElemAt: ["$monthlyEarnings.monthlyEarnings", 0] }
+ 
+
 
       }
     }
