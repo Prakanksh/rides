@@ -34,8 +34,13 @@ async function ensureWallets(userId, driverId) {
   }
 
   const admin = await Admin.findOne({});
-  if (admin && (admin.commission === undefined || admin.commission === null)) {
-    admin.commission = 0;
+  if (admin) {
+    if (admin.commission === undefined || admin.commission === null) {
+      admin.commission = 0;
+    }
+    if (admin.wallet === undefined || admin.wallet === null) {
+      admin.wallet = 0;
+    }
     await admin.save();
   }
 }

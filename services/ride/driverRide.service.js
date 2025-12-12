@@ -83,12 +83,17 @@ module.exports = {
 
     ride.driver = req.user._id;
     ride.status = "accepted";
+    
+    const otp = genOtp();
+    ride.otpForRideStart = otp;
     await ride.save();
 
     // Set driver as unavailable when ride is accepted
     await Driver.findByIdAndUpdate(req.user._id, { isAvailable: false });
 
-    return res.json(responseData("RIDE_ACCEPTED", { ride }, req, true));
+    sendToUser(ride.rider.toString(), "user:rideAccepted", { ride, event: "rideAccepted", otp });
+
+    return res.json(responseData("RIDE_ACCEPTED", { ride, otp }, req, true));
   },
 
   arrivedAtPickup: async (req, res) => {
@@ -102,12 +107,13 @@ module.exports = {
       return res.json(responseData("RIDE_NOT_IN_ACCEPTED_STATE", {}, req, false));
 
     ride.status = "arrived";
-    ride.otpForRideStart = genOtp();
     ride.updatedAt = new Date();
     await ride.save();
 
+    sendToUser(ride.rider.toString(), "user:driverArrived", { rideId: ride._id, event: "driverArrived" });
+
     return res.json(
-      responseData("DRIVER_ARRIVED", { ride, otpForTesting: ride.otpForRideStart }, req, true)
+      responseData("DRIVER_ARRIVED", { ride }, req, true)
     );
   },
 

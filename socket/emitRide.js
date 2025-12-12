@@ -65,6 +65,7 @@ function initSocketIO(io) {
           socket.emit("ride:accept:response", { success: false, message: "INVALID_PAYLOAD" });
           return;
         }
+        const otp = String(Math.floor(1000 + Math.random() * 9000));
         
         // Use atomic update to prevent race condition - only update if status is "requested" and driver is null
         const ride = await Ride.findOneAndUpdate(
@@ -76,6 +77,7 @@ function initSocketIO(io) {
           { 
             driver: driverId,
             status: "accepted",
+            otpForRideStart: otp,
             updatedAt: new Date()
           },
           { new: true }
@@ -100,7 +102,7 @@ function initSocketIO(io) {
         await Driver.findByIdAndUpdate(driverId, { isAvailable: false });
 
         const riderSocket = getUserSocketId(ride.rider);
-        const payloadToUser = { ride, event: "rideAccepted" };
+        const payloadToUser = { ride, event: "rideAccepted", otp };
         if (riderSocket && ioInstance) ioInstance.to(riderSocket).emit("user:rideAccepted", payloadToUser);
         else ioInstance.to(`user:${ride.rider}`).emit("user:rideAccepted", payloadToUser);
 
@@ -116,11 +118,10 @@ function initSocketIO(io) {
         if (!ride) { socket.emit("ride:arrived:response", { success:false, message:"INVALID_RIDE" }); return; }
         if (ride.status !== "accepted") { socket.emit("ride:arrived:response", { success:false, message:"RIDE_NOT_IN_ACCEPTED_STATE"}); return; }
 
-        const otp = String(Math.floor(1000 + Math.random() * 9000));
-        ride.status="arrived"; ride.otpForRideStart = otp; ride.updatedAt = new Date(); await ride.save();
+        ride.status="arrived"; ride.updatedAt = new Date(); await ride.save();
 
         const riderSocket = getUserSocketId(ride.rider);
-        const dataForUser = { rideId: ride._id, event: "driverArrived", otp };
+        const dataForUser = { rideId: ride._id, event: "driverArrived" };
         if (riderSocket && ioInstance) ioInstance.to(riderSocket).emit("user:driverArrived", dataForUser);
         else ioInstance.to(`user:${ride.rider}`).emit("user:driverArrived", dataForUser);
 

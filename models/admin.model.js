@@ -84,6 +84,10 @@ const AdminSchema = new mongoose.Schema(
     commission: {
       type: Number,
       default: 0
+    },
+    wallet: {
+      type: Number,
+      default: 0
     }
   },
   {
@@ -94,9 +98,11 @@ const AdminSchema = new mongoose.Schema(
 )
 
 AdminSchema.pre("save", function (next) {
-  // Round commission to 2 decimal places
   if (this.commission !== undefined && this.commission !== null) {
     this.commission = Number(this.commission.toFixed(2));
+  }
+  if (this.wallet !== undefined && this.wallet !== null) {
+    this.wallet = Number(this.wallet.toFixed(2));
   }
   
   // Only set adminId for new documents
