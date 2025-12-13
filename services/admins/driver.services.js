@@ -2,6 +2,7 @@
 const { responseData } = require("../../helpers/responseData");
 const driverModel = require("../../models/driver.model");
 const driverDocument = require("../../models/driverDocument");
+const vehicleModel = require("../../models/vehicle.model");
 
 module.exports={
     changeStatus :async (req, res) => {
@@ -9,14 +10,14 @@ module.exports={
     const { driverId, status } = req.body;
 
     if (!driverId) {
-      return res.status(400).json({ success: false, message: "driverId is required" });
+                return res.json(responseData('DRIVER_ID_REQUIRED', {}, req, false))
     }
-
     const updateFields = {};
 
     if (status) {
       if (!['active', 'inactive'].includes(status)) {
-        return res.status(400).json({ success: false, message: "Invalid status value" });
+      return res.json(responseData('INVALID_STATUS_VALUE', {}, req, false))
+
       }
       updateFields.status = status;
     }
@@ -27,16 +28,16 @@ module.exports={
     );
 
     if (!updatedDriver) {
-      return res.status(404).json({ success: false, message: "Driver not found" });
+            return res.json(responseData('DRIVER_NOT_FOUND', {}, req, false))
+
     }
-    return res.status(200).json({
-      success: true,
-      message: "Driver status updated successfully",
-  
-    });
+                
+    
+  return res.json(responseData('DRIVER_STATUS_UPDATED', {}, req, true))
 
   } catch (error) {
-    return res.status(500).json({ success: false, message: error.message });
+    console.log('Error', error.message)
+      return res.json(responseData('ERROR_OCCUR', {}, req, false))
   }
 },
 tempDelete: async (req, res) => {
@@ -60,9 +61,8 @@ tempDelete: async (req, res) => {
     return res.json(responseData("NO_CHANGES_APPLIED", {}, req, false));
 
   } catch (error) {
-    return res.json(
-      responseData("ERROR_OCCUR", { error: error.message }, req, false)
-    );
+   console.log('Error', error.message)
+      return res.json(responseData('ERROR_OCCUR', {}, req, false))
   }
 },
 updateDocStatus: async (req, res) => {
@@ -100,25 +100,68 @@ updateDocStatus: async (req, res) => {
     // Update the status
     driver.documents[docType].status = status;
     await driver.save();
+  return res.json(responseData('STATUS_UPDATED', {}, req, true))
 
-    return res.status(200).json({
-      success: true,
-      message: `${docType} status updated to ${status}`,
-      data: {
-        driverId: driver._id,
-        documentType: docType,
-        status: driver.documents[docType].status,
-        updatedAt: new Date()
-      }
-    });
+   
 
   } catch (error) {
-    console.error('Error updating document status:', error);
-    return res.status(500).json({
-      success: false,
-      message: 'Internal server error',
-      error: error.message
-    });
+    console.log('Error', error.message)
+      return res.json(responseData('ERROR_OCCUR', {}, req, false))
+  }
+},
+updateVehicleStatus: async (req, res) => {
+  try {
+    const { driverId } = req.params;
+    const { status } = req.body;
+
+    const allowedStatuses = ['active', 'inactive', 'pending'];
+
+    if (!status || !allowedStatuses.includes(status)) {
+        return res.json(responseData('INVALID_STATUS_VALUE', {}, req, false))  
+    }
+
+  
+    const vehicle = await vehicleModel.findOneAndUpdate(
+      { driver: driverId },
+      { status },
+      { new: true }
+    );
+
+    if (!vehicle) {
+              return res.json(responseData('VEHICLE_NOT_FOUND', {}, req, false))
+
+    }
+   return res.json(responseData('STATUS_UPDATED', vehicle, req, true))
+
+
+  } catch (error) {
+     console.log('Error', error.message)
+      return res.json(responseData('ERROR_OCCUR', {}, req, false))
+  }
+},
+
+getAllDrivers: async (req, res) => {
+  try {
+    // const drivers = await driverModel.find({ isDeleted: { $ne: true } }); 
+    const driverData = await driverModel.aggregate([
+      { $match: { isDeleted: { $ne: true } } },
+      {
+        $lookup: {  
+          from: 'vehicles',
+          localField: '_id',
+          foreignField: 'driver',
+          as: 'vehicleInfo' 
+        }
+      },
+    
+    ])
+ 
+       return res.json(responseData('DRIVER_FETCHED_SUCCESS', driverData, req, true))
+
+  }
+    catch (error) {
+    console.log('Error', error.message)
+      return res.json(responseData('ERROR_OCCUR', {}, req, false))
   }
 }
 }

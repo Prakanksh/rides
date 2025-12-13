@@ -991,5 +991,28 @@
   "NO_CHANGES_APPLIED":{
  "en": "No changes applied."  },
  "USER_SOFT_DELETED":{
-    "en": "User soft deleted successfully." }
+    "en": "User soft deleted successfully." },
+   "DRIVER_ID_REQUIRED":{
+    "en": "Driver ID is required."
+   } ,
+   "INVALID_STATUS_VALUE":{
+    "en": "Invalid status value."
+   },
+   "DRIVER_NOT_FOUND":{
+    "en": "Driver not found."
+   },
+   "DRIVER_STATUS_UPDATED":{
+    "en": "Driver status updated successfully."
+   },
+   "STATUS_UPDATED":{
+    "en": "Status updated successfully."
+   },
+   "VEHICLE_NOT_FOUND":{
+        "en": "Vehicle not found"
+   },
+   "DRIVER_FETCHED_SUCCESS":{
+        "en": "Driver fetched successfully."
+   }
+
+
 }

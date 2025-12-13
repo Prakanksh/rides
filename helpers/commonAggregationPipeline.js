@@ -804,86 +804,86 @@ getAdminDashboardPipeline: () => {
     //   { $project: { yearlyRevenue: 1 } }
     // ],
 
-  yearlyRevenue: [
-  {
-    $lookup: {
-      from: "rides",
-      pipeline: [
-        {
-          $group: {
-            _id: null,
-            totalRevenue: {
-              $sum: "$paymentDetails.adminCommissionAmount"
-            }
-          }
-        }
-      ],
-      as: "yearlyRevenue"
-    }
-  },
-  {
-    $project: {
-      _id: 0,
-      yearlyRevenue: {
-        $ifNull: [
-          { $arrayElemAt: ["$yearlyRevenue.totalRevenue", 0] },
-          0
-        ]
-      }
-    }
-  }
-],
+//   yearlyRevenue: [
+//   {
+//     $lookup: {
+//       from: "rides",
+//       pipeline: [
+//         {
+//           $group: {
+//             _id: null,
+//             totalRevenue: {
+//               $sum: "$paymentDetails.adminCommissionAmount"
+//             }
+//           }
+//         }
+//       ],
+//       as: "yearlyRevenue"
+//     }
+//   },
+//   {
+//     $project: {
+//       _id: 0,
+//       yearlyRevenue: {
+//         $ifNull: [
+//           { $arrayElemAt: ["$yearlyRevenue.totalRevenue", 0] },
+//           0
+//         ]
+//       }
+//     }
+//   }
+// ],
 
-revenueTrend: [
-  {
-    $lookup: {
-      from: "rides",
-      pipeline: [{$match: {status: "completed"}},
-        {
-          $group: {
-            _id: {
-              year: { $year: "$createdAt" },
-              month: { $month: "$createdAt" }
-            },
-            totalRevenue: {
-              $sum: "$paymentDetails.adminCommissionAmount"
-            }
-          }
-        },
-        { $sort: { "_id.year": -1, "_id.month": 1 } },
+// revenueTrend: [
+//   {
+//     $lookup: {
+//       from: "rides",
+//       pipeline: [{$match: {status: "completed"}},
+//         {
+//           $group: {
+//             _id: {
+//               year: { $year: "$createdAt" },
+//               month: { $month: "$createdAt" }
+//             },
+//             totalRevenue: {
+//               $sum: "$paymentDetails.adminCommissionAmount"
+//             }
+//           }
+//         },
+//         { $sort: { "_id.year": -1, "_id.month": 1 } },
 
       
-        {
-          $project: {
-            _id: 0,
-            month: {
-              $switch: {
-                branches: [
-                  { case: { $eq: ["$_id.month", 1] }, then: "Jan" },
-                  { case: { $eq: ["$_id.month", 2] }, then: "Feb" },
-                  { case: { $eq: ["$_id.month", 3] }, then: "Mar" },
-                  { case: { $eq: ["$_id.month", 4] }, then: "Apr" },
-                  { case: { $eq: ["$_id.month", 5] }, then: "May" },
-                  { case: { $eq: ["$_id.month", 6] }, then: "Jun" },
-                  { case: { $eq: ["$_id.month", 7] }, then: "Jul" },
-                  { case: { $eq: ["$_id.month", 8] }, then: "Aug" },
-                  { case: { $eq: ["$_id.month", 9] }, then: "Sep" },
-                  { case: { $eq: ["$_id.month", 10] }, then: "Oct" },
-                  { case: { $eq: ["$_id.month", 11] }, then: "Nov" },
-                  { case: { $eq: ["$_id.month", 12] }, then: "Dec" }
-                ],
-                default: "Unknown"
-              }
-            },
-            totalRevenue: 1
-          }
-        }
-      ],
-      as: "revenueTrend"
-    }
-  },
-  { $project: { revenueTrend: 1 } }
-],
+//         {
+//           $project: {
+//             _id: 0,
+//             month: {
+//               $switch: {
+//                 branches: [
+//                   { case: { $eq: ["$_id.month", 1] }, then: "Jan" },
+//                   { case: { $eq: ["$_id.month", 2] }, then: "Feb" },
+//                   { case: { $eq: ["$_id.month", 3] }, then: "Mar" },
+//                   { case: { $eq: ["$_id.month", 4] }, then: "Apr" },
+//                   { case: { $eq: ["$_id.month", 5] }, then: "May" },
+//                   { case: { $eq: ["$_id.month", 6] }, then: "Jun" },
+//                   { case: { $eq: ["$_id.month", 7] }, then: "Jul" },
+//                   { case: { $eq: ["$_id.month", 8] }, then: "Aug" },
+//                   { case: { $eq: ["$_id.month", 9] }, then: "Sep" },
+//                   { case: { $eq: ["$_id.month", 10] }, then: "Oct" },
+//                   { case: { $eq: ["$_id.month", 11] }, then: "Nov" },
+//                   { case: { $eq: ["$_id.month", 12] }, then: "Dec" }
+//                 ],
+//                 default: "Unknown"
+//               }
+//             },
+//             totalRevenue: 1
+//           }
+//         }
+//       ],
+//       as: "revenueTrend"
+//     }
+//   },
+//   { $project: { revenueTrend: 1 } }
+// ],
 
 earnings: [
   {
@@ -980,6 +980,61 @@ yearlyEarnings: [
   }
 ],
 
+// monthlyEarnings: [
+//   {
+//     $lookup: {
+//       from: "transactions",
+//       pipeline: [
+//         { $match: { status: "completed" } },
+//         {
+//           $group: {
+//             _id: {
+//               year: { $year: "$createdAt" },
+//               month: { $month: "$createdAt" }
+//             },
+//             totalEarnings: {
+//               $sum: {
+//                 $subtract: [
+//                   { $cond: [{ $eq: ["$paidTo", "admin"] }, "$amount", 0] },
+//                   { $cond: [{ $eq: ["$paidBy", "admin"] }, "$amount", 0] }
+//                 ]
+//               }
+//             }
+//           }
+//         },
+//         { $sort: { "_id.year": -1, "_id.month": -1 } },
+//         {
+//           $project: {
+//             _id: 0,
+//             // year: "$_id.year",
+//             month: {
+//               $switch: {
+//                 branches: [
+//                   { case: { $eq: ["$_id.month", 1] }, then: "Jan" },
+//                   { case: { $eq: ["$_id.month", 2] }, then: "Feb" },
+//                   { case: { $eq: ["$_id.month", 3] }, then: "Mar" },
+//                   { case: { $eq: ["$_id.month", 4] }, then: "Apr" },
+//                   { case: { $eq: ["$_id.month", 5] }, then: "May" },
+//                   { case: { $eq: ["$_id.month", 6] }, then: "Jun" },
+//                   { case: { $eq: ["$_id.month", 7] }, then: "Jul" },
+//                   { case: { $eq: ["$_id.month", 8] }, then: "Aug" },
+//                   { case: { $eq: ["$_id.month", 9] }, then: "Sep" },
+//                   { case: { $eq: ["$_id.month", 10] }, then: "Oct" },
+//                   { case: { $eq: ["$_id.month", 11] }, then: "Nov" },
+//                   { case: { $eq: ["$_id.month", 12] }, then: "Dec" }
+//                 ],
+//                 default: "Unknown"
+//               }
+//             },
+//             totalEarnings: 1
+//           }
+//         }
+//       ],
+//       as: "monthlyEarnings"
+//     }
+//   },
+//   { $project: { monthlyEarnings: 1 } }
+// ]
 monthlyEarnings: [
   {
     $lookup: {
@@ -989,7 +1044,6 @@ monthlyEarnings: [
         {
           $group: {
             _id: {
-              year: { $year: "$createdAt" },
               month: { $month: "$createdAt" }
             },
             totalEarnings: {
@@ -1002,38 +1056,70 @@ monthlyEarnings: [
             }
           }
         },
-        { $sort: { "_id.year": -1, "_id.month": -1 } },
         {
           $project: {
             _id: 0,
-            // year: "$_id.year",
-            month: {
-              $switch: {
-                branches: [
-                  { case: { $eq: ["$_id.month", 1] }, then: "Jan" },
-                  { case: { $eq: ["$_id.month", 2] }, then: "Feb" },
-                  { case: { $eq: ["$_id.month", 3] }, then: "Mar" },
-                  { case: { $eq: ["$_id.month", 4] }, then: "Apr" },
-                  { case: { $eq: ["$_id.month", 5] }, then: "May" },
-                  { case: { $eq: ["$_id.month", 6] }, then: "Jun" },
-                  { case: { $eq: ["$_id.month", 7] }, then: "Jul" },
-                  { case: { $eq: ["$_id.month", 8] }, then: "Aug" },
-                  { case: { $eq: ["$_id.month", 9] }, then: "Sep" },
-                  { case: { $eq: ["$_id.month", 10] }, then: "Oct" },
-                  { case: { $eq: ["$_id.month", 11] }, then: "Nov" },
-                  { case: { $eq: ["$_id.month", 12] }, then: "Dec" }
-                ],
-                default: "Unknown"
-              }
-            },
+            month: "$_id.month",
             totalEarnings: 1
           }
         }
       ],
-      as: "monthlyEarnings"
+      as: "dbMonths"
     }
   },
-  { $project: { monthlyEarnings: 1 } }
+
+  // Create static list of all 12 months
+  {
+    $addFields: {
+      allMonths: [
+        { month: 1, name: "Jan" },
+        { month: 2, name: "Feb" },
+        { month: 3, name: "Mar" },
+        { month: 4, name: "Apr" },
+        { month: 5, name: "May" },
+        { month: 6, name: "Jun" },
+        { month: 7, name: "Jul" },
+        { month: 8, name: "Aug" },
+        { month: 9, name: "Sep" },
+        { month: 10, name: "Oct" },
+        { month: 11, name: "Nov" },
+        { month: 12, name: "Dec" }
+      ]
+    }
+  },
+
+  // Merge DB results into the static month list
+  {
+    $project: {
+      monthlyEarnings: {
+        $map: {
+          input: "$allMonths",
+          as: "m",
+          in: {
+            month: "$$m.name",
+            totalEarnings: {
+              $let: {
+                vars: {
+                  match: {
+                    $arrayElemAt: [
+                      {
+                        $filter: {
+                          input: "$dbMonths",
+                          cond: { $eq: ["$$this.month", "$$m.month"] }
+                        }
+                      },
+                      0
+                    ]
+                  }
+                },
+                in: { $ifNull: ["$$match.totalEarnings", 0] }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
 ]
 
 // 
@@ -1048,17 +1134,17 @@ monthlyEarnings: [
 
         totalRides: { $arrayElemAt: ["$rides.totalRides", 0] },
         // cancelledRides: { $arrayElemAt: ["$rides.cancelledRides", 0] },
-        totalRevenue: { $arrayElemAt: ["$rides.totalRevenue", 0] },
+        // totalRevenue: { $arrayElemAt: ["$rides.totalRevenue", 0] },
         // totalDriverEarnings: {
         //   $arrayElemAt: ["$rides.totalDriverEarnings", 0]
         // },
 
        
-          yearlyRevenue: { $arrayElemAt: ["$yearlyRevenue.yearlyRevenue", 0] },
+//           yearlyRevenue: { $arrayElemAt: ["$yearlyRevenue.yearlyRevenue", 0] },
    
-revenueTrend: { 
-  $arrayElemAt: ["$revenueTrend.revenueTrend", 0] 
-},  
+// revenueTrend: { 
+//   $arrayElemAt: ["$revenueTrend.revenueTrend", 0] 
+// },  
   totalEarnings: { $arrayElemAt: ["$earnings.totalEarnings", 0] },
    yearlyEarnings: { $arrayElemAt: ["$yearlyEarnings.yearlyEarnings", 0] },
     monthlyEarnings: { $arrayElemAt: ["$monthlyEarnings.monthlyEarnings", 0] }

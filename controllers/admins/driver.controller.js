@@ -8,7 +8,7 @@ module.exports = {
       await driverService.changeStatus(req, res)
     } catch (err) {
       const msg = err.message || 'SOMETHING_WENT_WRONG'
-      return res.status(422).json(responseData(msg, {}, req))
+      return res.status(422).json(responseData(msg, {}, req,true))
     }   
 },
 tempDelete: async(req,res)=>{
@@ -24,6 +24,21 @@ tempDelete: async(req,res)=>{
           await driverService.updateDocStatus(req, res)
         } catch (err) {
           const msg = err.message || 'SOMETHING_WENT_WRONG'
-          return res.status(422).json(responseData(msg, {}, req))
-        }   }
+          return res.status(422).json(responseData(msg, {}, req,true))
+        }   },
+updateVehicleStatus: async (req, res) => {
+        try {
+          console.log("controller")
+          await driverService.updateVehicleStatus(req, res)
+        } catch (err) {
+          const msg = err.message || 'SOMETHING_WENT_WRONG'
+          return res.status(422).json(responseData(msg, {}, req,true))
+        } }  , 
+        getAllDrivers: async (req, res) => {
+          try {
+            await driverService.getAllDrivers(req, res)
+          } catch (err) {   
+            const msg = err.message || 'SOMETHING_WENT_WRONG'
+            return res.status(422).json(responseData(msg, {}, req,true))
+          }   }     
 }
