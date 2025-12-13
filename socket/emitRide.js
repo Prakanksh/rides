@@ -420,7 +420,7 @@ function initSocketIO(io) {
           return;
         }
         
-        const newDriver = await Driver.findOne({
+        const nearbyDrivers = await Driver.find({
           _id: { $in: availableDriverIds },
           isAvailable: true,
           registrationStatus: "approved",
@@ -434,25 +434,21 @@ function initSocketIO(io) {
               $maxDistance: 5000
             }
           }
-        }).select("_id");
+        }).select("_id").limit(10);
 
-        if (newDriver) {
-          ride.driver = newDriver._id;
-          await ride.save();
-
-          const newDriverSocket = getDriverSocketId(newDriver._id);
-          if (newDriverSocket && ioInstance) {
-            ioInstance.to(newDriverSocket).emit("ride:new", ride);
-          }
+        if (nearbyDrivers.length > 0) {
+          nearbyDrivers.forEach(driver => {
+            sendRideToDriver(driver._id.toString(), ride);
+          });
 
           const riderSocket = getUserSocketId(ride.rider);
           if (riderSocket && ioInstance) {
-            ioInstance.to(riderSocket).emit("user:driverChanged", { ride, message: "Your driver cancelled. New driver assigned!" });
+            ioInstance.to(riderSocket).emit("user:searchingDriver", { ride, message: "Your driver cancelled. Finding new driver..." });
           } else {
-            ioInstance.to(`user:${ride.rider}`).emit("user:driverChanged", { ride, message: "Your driver cancelled. New driver assigned!" });
+            ioInstance.to(`user:${ride.rider}`).emit("user:searchingDriver", { ride, message: "Your driver cancelled. Finding new driver..." });
           }
 
-          socket.emit("ride:cancel:response", { success: true, ride, newDriverAssigned: true });
+          socket.emit("ride:cancel:response", { success: true, ride, newDriverAssigned: false });
         } else {
           const riderSocket = getUserSocketId(ride.rider);
           if (riderSocket && ioInstance) {

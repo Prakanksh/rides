@@ -221,12 +221,8 @@ module.exports = {
     const ride = await Ride.findOne({ _id: rideId, driver: driverId });
     if (!ride) return res.json(responseData("INVALID_RIDE", {}, req, false));
 
-    if (ride.status === "completed") {
-      return res.json(responseData("RIDE_ALREADY_COMPLETED", {}, req, false));
-    }
-
-    if (ride.status === "cancelled") {
-      return res.json(responseData("RIDE_ALREADY_CANCELLED", {}, req, false));
+    if (ride.status === "completed" || ride.status === "cancelled") {
+      return res.json(responseData("RIDE_CANNOT_BE_CANCELLED", {}, req, false));
     }
 
     if (ride.status === "ongoing" || ride.status === "reachedDestination") {
@@ -275,7 +271,7 @@ module.exports = {
       return res.json(responseData("RIDE_SEARCHING_DRIVER", { ride, newDriverAssigned: false }, req, true));
     }
     
-    const newDriver = await Driver.findOne({
+    const nearbyDrivers = await Driver.find({
       _id: { $in: availableDriverIds },
       isAvailable: true,
       registrationStatus: "approved",
@@ -289,19 +285,19 @@ module.exports = {
           $maxDistance: 5000
         }
       }
-    }).select("_id");
+    }).select("_id").limit(10);
 
-    if (newDriver) {
-      ride.driver = newDriver._id;
-      await ride.save();
-
-      sendRideToDriver(newDriver._id.toString(), ride);
-      sendToUser(ride.rider.toString(), "user:driverChanged", { 
+    if (nearbyDrivers.length > 0) {
+      // Send ride notification to all nearby eligible drivers (no assignment until acceptance)
+      nearbyDrivers.forEach(driver => {
+        sendRideToDriver(driver._id.toString(), ride);
+      });
+      sendToUser(ride.rider.toString(), "user:searchingDriver", { 
         ride, 
-        message: "Your driver cancelled. New driver assigned!" 
+        message: "Your driver cancelled. Finding new driver..." 
       });
 
-      return res.json(responseData("RIDE_REASSIGNED", { ride, newDriverAssigned: true }, req, true));
+      return res.json(responseData("RIDE_SEARCHING_DRIVER", { ride, newDriverAssigned: false }, req, true));
     } else {
       sendToUser(ride.rider.toString(), "user:searchingDriver", { 
         ride, 

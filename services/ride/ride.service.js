@@ -221,16 +221,12 @@ createRide: async (req, res) => {
     const ride = await Ride.findOne({ _id: rideId, rider: riderId });
     if (!ride) return res.json(responseData("INVALID_RIDE", {}, req, false));
 
-    if (ride.status === "completed") {
-      return res.json(responseData("RIDE_ALREADY_COMPLETED", {}, req, false));
+    if (ride.status === "completed" || ride.status === "cancelled") {
+      return res.json(responseData("RIDE_CANNOT_BE_CANCELLED", {}, req, false));
     }
 
-    if (ride.status === "cancelled") {
-      return res.json(responseData("RIDE_ALREADY_CANCELLED", {}, req, false));
-    }
-
-    if (ride.status === "reachedDestination") {
-      return res.json(responseData("CANNOT_CANCEL_RIDE_AT_DESTINATION", {}, req, false));
+    if (ride.status === "ongoing" || ride.status === "reachedDestination") {
+      return res.json(responseData("CANNOT_CANCEL_RIDE_IN_PROGRESS", {}, req, false));
     }
 
     ride.status = "cancelled";
