@@ -100,5 +100,20 @@ module.exports = {
       );
   }
 },
-
+updateSupportStatus : async (req, res) => {
+    try {
+      await adminService.updateSupportStatus(req, res)
+    } catch (err) {
+      const msg = err.message || 'SOMETHING_WENT_WRONG'
+      return res.status(422).json(responseData(msg, {}, req))
+    }
+  },
+  getSupportInquires : async (req, res) => {
+    try {
+      await adminService.getSupportInquires(req, res)
+    } catch (err) {
+      const msg = err.message || 'SOMETHING_WENT_WRONG'
+      return res.status(422).json(responseData(msg, {}, req))
+    }
+  },
 }

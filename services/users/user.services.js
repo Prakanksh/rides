@@ -34,6 +34,7 @@ const Banner = require('../../models/banner.model')
 const Country = require('../../models/countries.model')
 const Notification = require('../../models/notification.model')
 const SubCategory = require('../../models/subCategory.model')
+const supportModel = require('../../models/support.model')
 module.exports = {
   refreshToken: async (req, res) => {
     try {
@@ -1267,7 +1268,32 @@ module.exports = {
       console.log('error', error)
       return res.json(responseData('ERROR_OCCUR', error.message, req, false))
     }
+  },
+ submitSupportRequest  : async (req, res) => {
+  try {
+    const { name, email, mobile, message, role } = req.body;
+const {candidateId} = req.params
+    if (!name || !email || !mobile || !message || !role || !candidateId) {
+         return res.json(responseData('ALL_FIELDS_REQUIRED', {}, req, true))
+
+    }
+
+    const support = await supportModel.create({
+      name,
+      email,
+      mobile,
+      message,
+      role,
+      candidateId
+    });
+
+          return res.json(responseData('SUPPORT_REQUEST_SUBMITTED', {support}, req, true))
+
+  } catch (err) {
+    console.error("Support Create Error:", err);
+      return res.json(responseData('ERROR_OCCUR', err.message, req, false))
   }
+}
 }
 
 const handleSocialRegistration = async (

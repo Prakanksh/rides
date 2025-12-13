@@ -21,6 +21,8 @@ const constant = require('../../helpers/constant')
 const Country = require('../../models/countries.model')
 const { getAdminDashboardPipeline } = require('../../helpers/commonAggregationPipeline')
 const User = require('../../models/user.model')
+const supportModel = require('../../models/support.model')
+const { getSupportInquires } = require('../../controllers/admins/admin.controller')
 
 module.exports = {
   adminLogin: async (req, res) => {
@@ -354,7 +356,45 @@ module.exports = {
 
     return { success: true, message: "ADMIN_DASHBOARD_FETCHED", data: result[0] };
   } catch (error) {
-    return { success: false, message: error.message || "SERVER_ERROR" };
+    return res.json(responseData('ERROR_OCCUR', error.message, req, false))
+  }
+},
+updateSupportStatus: async (req, res) => {
+  try {
+    const { supportId } = req.params;
+    const { status } = req.body;
+
+    const allowed = ["open", "in-progress", "closed", "reopened"];
+    if (!allowed.includes(status)) {
+            return res.json(responseData('INVALID_STATUS', {}, req, false))
+
+    
+    }
+
+    const updated = await supportModel.findByIdAndUpdate(
+      supportId,
+      { status },
+      { new: true }
+    );
+
+    if (!updated) {
+          return res.json(responseData('SUPPORT_REQ_NOT_FOUND', {}, req, false))
+    }
+
+   
+       return res.json(responseData('STATUS_UPDATED', updated, req, true))
+  } catch (err) {
+    console.error("Status Update Error:", err);
+      return res.json(responseData('ERROR_OCCUR', err.message, req, false))
+  }
+},
+ getSupportInquires:async (req, res) => {
+  try {
+    const requests = await supportModel.find().sort({createdAt: -1 });
+    return res.json(responseData('REQUEST_FETCH', requests, req, true))
+  } catch (error) {
+    console.error("Get Requests Error:", error);
+    return res.json(responseData('ERROR_OCCUR', error.message, req, false))
   }
 }
 }

@@ -1012,7 +1012,20 @@
    },
    "DRIVER_FETCHED_SUCCESS":{
         "en": "Driver fetched successfully."
-   }
-
+   },
+   "SUPPORT_REQ_NOT_FOUND":{
+        "en": "Support request not found."
+   },
+"REQUEST_FETCH":{
+    "en": "Request fetched successfully."
+},
+"SUPPORT_REQUEST_FOUND":{
+    "en": "Support request found successfully." },
+    "SUPPORT_REQUEST_SUBMITTED":{
+    "en": "Support request submitted successfully."
+    },
+    "ALL_FIELDS_REQUIRED":{
+    "en": "All fields are required."
+    }
 
 }

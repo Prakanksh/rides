@@ -16,4 +16,7 @@ router
   .post('/generatePreSignedUrl', [verifyToken], admin.generatePresignedURL)
   .get('/country-list', [verifyToken], admin.countryList)
   .get('/dashboard', admin.getAdminDashboard)
+     .patch('/support/:supportId/status', admin.updateSupportStatus)
+     .get('/support/inquiries', admin.getSupportInquires)
+
 module.exports = router

@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 const { responseData } = require('../../helpers/responseData');
 const Driver = require('../../models/driver.model');
 const Vehicle = require('../../models/vehicle.model');
+const supportModel = require('../../models/support.model');
 
 // fields allowed maps will be used by updateProfile
 const editableBeforeApproval = [
@@ -238,5 +239,28 @@ if (!['two-wheeler', 'auto', 'mini', 'prime-sedan', 'suv'].includes(vehicleType)
       return res.json(responseData("ERROR_OCCUR", err.message, req, false));
     }
   },
+ submitSupportRequest  : async (req, res) => {
+  try {
+    const { name, email, mobile, message, role } = req.body;
+const {candidateId} = req.params
+    if (!name || !email || !mobile || !message || !role || !candidateId) {
+          return res.json(responseData('ALL_FIELDS_REQUIRED', {}, req, false));
 
+    }
+
+    const support = await supportModel.create({
+      name,
+      email,
+      mobile,
+      message,
+      role,
+      candidateId
+    });
+
+    return res.json(responseData("SUPPORT_REQUEST_SUBMITTED",support, req, true));
+  } catch (err) {
+    console.error("Support Create Error:", err);
+    return res.json(responseData('SERVER_ERROR', {}, req, false));
+  }
+}
 };

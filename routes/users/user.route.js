@@ -41,8 +41,10 @@ const {
   notificationAndFavoriteCount,
   subCategoryListMasterData,
   verifyOtpMobileSocialSignUp,
-  sendOtpMobileSocialSignUp
+  sendOtpMobileSocialSignUp,
+  createSupport
 } = require('../../controllers/users/user.controller')
+const { submitSupportRequest } = require('../../services/users/user.services')
 
 router
   .post('/register', validationRule.validate('register'), register)
@@ -122,10 +124,12 @@ router
   .get('/siteVisitNotification', [verifyToken], siteVisitNotification)
   .get('/category-list', [], categoryList)
   .get('/banner-list', [], bannerList)
-  .get('/recent-view-products', [verifyToken], recentViewProducts)
+  .get('/recent-view-products', [verifyToken], recentViewProducts) 
   .get('/favorite-product-list', [verifyToken], favoriteProductList)
   .get('/country-list', [], countryList)
   .get('/notification-favorite-count', [verifyToken], notificationAndFavoriteCount)
   .get('/sub-category-list', [], subCategoryListMasterData)
+    .post('/support/:candidateId', [verifyToken], createSupport )
+
   // .post('/user-document', [], userDocs.uploadDocuments)
 module.exports = router

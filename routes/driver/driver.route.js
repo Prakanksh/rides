@@ -20,6 +20,6 @@ router.post('/register', driverController.register)
 router.put('/update-profile', verifyToken, driverController.updateProfile)
 router.post("/update-location", verifyToken, driverController.updateLocation);
 router.post("/upload-driver-docs",[verifyToken],driverDocFields,  parseMultipartJSONFields(jsonFieldsForDriver), driverDocs.uploadDocuments);
-
+    router.post('/support/:candidateId', [verifyToken], driverController.createSupport )
 
 module.exports = router
