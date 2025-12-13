@@ -175,14 +175,14 @@ userSchema.pre('save', function (next) {
   
   // Only set userId for new documents
   if (this.isNew && !this.userId) {
-    mongoose
-      .model('users')
-      .findOne({})
-      .sort({ userId: -1 })
-      .then((entry) => {
-        this.userId = (parseInt(entry?.userId) || 0) + 1
-        next()
-      })
+  mongoose
+    .model('users')
+    .findOne({})
+    .sort({ userId: -1 })
+    .then((entry) => {
+      this.userId = (parseInt(entry?.userId) || 0) + 1
+      next()
+    })
       .catch((err) => next(err))
   } else {
     next()

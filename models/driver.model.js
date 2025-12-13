@@ -28,6 +28,19 @@ const DriverSchema = new mongoose.Schema(
     languages: [String],
     profile: { type: String },
     token: { type: String },
+    deviceId: {
+      type: String,
+      default: null
+    },
+    deviceType: {
+      type: String,
+      enum: ['android', 'ios'],
+      default: null
+    },
+    deviceToken: {
+      type: String,
+      default: null
+    },
     location: {
       type: { type: String, enum: ['Point'], default: 'Point' },
       coordinates: { type: [Number], default: [0, 0] }
@@ -58,7 +71,11 @@ const DriverSchema = new mongoose.Schema(
       default: "driver"
     },
     isEmailVerified: { type: Boolean, default: false },
-    isMobileVerified: { type: Boolean, default: false }
+    isMobileVerified: { type: Boolean, default: false },
+    notifications: {
+      type: Boolean,
+      default: true
+    }
   },
   { timestamps: true, versionKey: false }
 );

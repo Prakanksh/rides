@@ -25,6 +25,13 @@ initSocketIO(io);
 // -------------------------
 db.initialize();
 
+// -------------------------
+// INITIALIZE CRON JOBS
+// -------------------------
+const crons = require('./helpers/cron');
+crons.cashSettlement();
+crons.walletSettlement();
+
 const corsOption = {
   methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
   exposedHeaders: ['x-access-token']
