@@ -34,8 +34,8 @@ const DriverSchema = new mongoose.Schema(
     },
     deviceType: {
       type: String,
-      enum: ['android', 'ios'],
-      default: null
+      default: null,
+      required: false
     },
     deviceToken: {
       type: String,
@@ -86,6 +86,9 @@ DriverSchema.pre('save', function (next) {
   }
   if (this.driverCommission !== undefined && this.driverCommission !== null) {
     this.driverCommission = Number(this.driverCommission.toFixed(2));
+  }
+  if (this.deviceType === null || this.deviceType === undefined) {
+    this.deviceType = undefined;
   }
   next();
 });
