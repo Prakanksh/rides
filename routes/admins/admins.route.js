@@ -18,5 +18,6 @@ router
   .get('/dashboard', admin.getAdminDashboard)
      .patch('/support/:supportId/status', admin.updateSupportStatus)
      .get('/support/inquiries', admin.getSupportInquires)
+.post("/create-promocode", [verifyToken], admin.createPromoCode);
 
 module.exports = router

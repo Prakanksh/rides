@@ -171,6 +171,7 @@ createRide: async (req, res) => {
       }
          pickupLat = parseFloat(pickupLat);
     pickupLng = parseFloat(pickupLng);
+
       const drivers = await Driver.find({
         isAvailable: true,
         registrationStatus: "approved",
@@ -182,6 +183,8 @@ createRide: async (req, res) => {
           }
         }
       }).select("firstName lastName mobile location");
+
+      
       return res.json(responseData("NEARBY_DRIVERS", { drivers }, req, true));
     } catch (err) {
       return res.json(responseData(err.message, {}, req, false));

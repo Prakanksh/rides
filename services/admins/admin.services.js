@@ -22,7 +22,8 @@ const Country = require('../../models/countries.model')
 const { getAdminDashboardPipeline } = require('../../helpers/commonAggregationPipeline')
 const User = require('../../models/user.model')
 const supportModel = require('../../models/support.model')
-const { getSupportInquires } = require('../../controllers/admins/admin.controller')
+const { getSupportInquires, createPromoCode } = require('../../controllers/admins/admin.controller')
+const promoCodeModel = require('../../models/promoCode.model')
 
 module.exports = {
   adminLogin: async (req, res) => {
@@ -396,7 +397,15 @@ updateSupportStatus: async (req, res) => {
     console.error("Get Requests Error:", error);
     return res.json(responseData('ERROR_OCCUR', error.message, req, false))
   }
-}
+},
+createPromoCode: async (req, res) => {  
+    try {
+      const promo = await promoCodeModel.create(req.body);
+      return res.json(responseData('PROMO_CREATED', promo, req, true))
+    } catch (err) {
+      const msg = err.message || 'SOMETHING_WENT_WRONG'
+      return res.status(422).json(responseData(msg, {}, req))
+    }   }
 }
 
 const isInvalidRequest = (type) => isEmpty(type)
