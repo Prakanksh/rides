@@ -978,5 +978,54 @@
   "MONTHS_EMPTY": {
     "en": "Number of months is required.",
     "ar": ""
-  }
+  },
+  "FETCH_USERS_FAILED":{
+      "en": "Failed to fetch users."
+  },
+  "DASHBOARD_DATA_NOT_FOUND":{
+ "en": "dashboard data not found."
+  },
+  "ADMIN_DASHBOARD_FETCHED":{
+ "en": "dashboard data fetched successfully."
+  },
+  "NO_CHANGES_APPLIED":{
+ "en": "No changes applied."  },
+ "USER_SOFT_DELETED":{
+    "en": "User soft deleted successfully." },
+   "DRIVER_ID_REQUIRED":{
+    "en": "Driver ID is required."
+   } ,
+   "INVALID_STATUS_VALUE":{
+    "en": "Invalid status value."
+   },
+   "DRIVER_NOT_FOUND":{
+    "en": "Driver not found."
+   },
+   "DRIVER_STATUS_UPDATED":{
+    "en": "Driver status updated successfully."
+   },
+   "STATUS_UPDATED":{
+    "en": "Status updated successfully."
+   },
+   "VEHICLE_NOT_FOUND":{
+        "en": "Vehicle not found"
+   },
+   "DRIVER_FETCHED_SUCCESS":{
+        "en": "Driver fetched successfully."
+   },
+   "SUPPORT_REQ_NOT_FOUND":{
+        "en": "Support request not found."
+   },
+"REQUEST_FETCH":{
+    "en": "Request fetched successfully."
+},
+"SUPPORT_REQUEST_FOUND":{
+    "en": "Support request found successfully." },
+    "SUPPORT_REQUEST_SUBMITTED":{
+    "en": "Support request submitted successfully."
+    },
+    "ALL_FIELDS_REQUIRED":{
+    "en": "All fields are required."
+    }
+
 }

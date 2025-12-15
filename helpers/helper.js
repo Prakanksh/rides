@@ -102,19 +102,6 @@ module.exports = {
 
     return referralCode
   },
-  generateRandomAlphanumericId(length) {
-    const characters =
-      'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
-    const charactersLength = characters.length
-    let randomId = ''
-
-    for (let i = 0; i < length; i++) {
-      const randomIndex = crypto.randomInt(0, charactersLength)
-      randomId += characters.charAt(randomIndex)
-    }
-
-    return randomId
-  },
   generatePutPresignedUrl: async (
     bucketName,
     objectKey,
@@ -1015,4 +1002,25 @@ module.exports = {
       console.log('SMS Fails err', err?.message)
     }
   }
+  ,
+    parseMultipartJSONFields: (fields) => (req, res, next) => {
+  if (!req.body) req.body = {};
+
+  for (const field of fields) {
+    if (req.body[field] && typeof req.body[field] === 'string') {
+      // Only parse if it looks like JSON
+      if (req.body[field].startsWith('{') || req.body[field].startsWith('[')) {
+        try {
+          req.body[field] = JSON.parse(req.body[field]);
+        } catch (err) {
+          return res.status(400).json({
+            success: false,
+            message: `${field.toUpperCase()}_INVALID_JSON`
+          });
+        }
+      }
+    }
+  }
+  next();
+}
 }

@@ -58,7 +58,7 @@ const handleVerification = async (req, res, next, token) => {
     }
 
     req.user = user
-
+console.log(user,"------")
     switch (user.userType || user.role) {
       case constant.type.admin:
       case constant.type.subAdmin:
@@ -84,6 +84,7 @@ const handleVerification = async (req, res, next, token) => {
 
 exports.verifyToken = async (req, res, next) => {
   const token = getTokenFromHeaders(req.headers)
+
   if (!token) {
     return res.status(401).json(responseData('NOT_AUTHORIZED', {}, req, true))
   }
