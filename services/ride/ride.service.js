@@ -5,162 +5,103 @@ const { responseData } = require("../../helpers/responseData");
 const { calculateDistanceInKm } = require("../../helpers/distance");
 const { calculateFare } = require("../../helpers/fareConfig");
 const { sendRideToDriver, sendToUser } = require("../../socket/emitRide");
+const { calculateETA } = require("../../helpers/etaCalculator");
 
 module.exports = {
+  createRide: async (req, res) => {
+    try {
+      const { pickupLocation, dropLocation, vehicleType, paymentMethod } = req.body;
 
-  // createRide: async (req, res) => {
-  //   try {
-  //     const {
-  //       pickupLocation,
-  //       dropLocation,
-  //       vehicleType,
-  //       paymentMethod
-  //     } = req.body;
+      const riderId = req.user?._id;
+      if (!riderId) {
+        return res.json(responseData("NOT_AUTHORIZED", {}, req, false));
+      }
 
-  //     const riderId = req.user?._id;
-  //     if (!riderId) return res.json(responseData("NOT_AUTHORIZED", {}, req, false));
+      if (!pickupLocation?.coordinates || !dropLocation?.coordinates) {
+        return res.json(responseData("LOCATIONS_REQUIRED", {}, req, false));
+      }
 
-  //     if (!pickupLocation?.coordinates || !dropLocation?.coordinates) {
-  //       return res.json(responseData("LOCATIONS_REQUIRED", {}, req, false));
-  //     }
+      const [pickupLng, pickupLat] = pickupLocation.coordinates;
+      const [dropLng, dropLat] = dropLocation.coordinates;
+      const distanceKm = calculateDistanceInKm(pickupLat, pickupLng, dropLat, dropLng);
+      const fareData = calculateFare(distanceKm);
 
-  //     if (!vehicleType) {
-  //       return res.json(responseData("VEHICLE_TYPE_REQUIRED", {}, req, false));
-  //     }
+      const etaData = await calculateETA({
+        origin: [pickupLng, pickupLat],
+        destination: [dropLng, dropLat],
+        vehicleType,
+        distanceKm
+      }, {
+        useGoogleMaps: false
+      });
 
-  //     const [pickupLat, pickupLng] = pickupLocation.coordinates;
-  //     const [dropLat, dropLng] = dropLocation.coordinates;
+      const ride = await Ride.create({
+        rider: riderId,
+        driver: null,
+        pickupLocation,
+        dropLocation,
+        distance: Number(distanceKm.toFixed(2)),
+        estimatedFare: fareData.estimatedFare,
+        finalFare: 0,
+        vehicleType,
+        paymentMethod: paymentMethod || "cash",
+        status: "requested",
+        estimatedTime: etaData.estimatedTime
+      });
 
-  //     const distanceKm = calculateDistanceInKm(pickupLat, pickupLng, dropLat, dropLng);
-  //     const fareData = calculateFare(distanceKm);
+      const normalizedVehicleType = vehicleType === "prime sedan" ? "prime-sedan" : vehicleType;
+      const vehiclesWithMatchingType = await Vehicle.find({
+        type: normalizedVehicleType,
+        status: "active"
+      }).select("driver").lean();
+      
+      const driverIdsWithMatchingVehicle = vehiclesWithMatchingType.map(v => v.driver);
+      
+      if (driverIdsWithMatchingVehicle.length === 0) {
+        return res.json(
+          responseData(
+            "RIDE_CREATED",
+            { ride, nearbyDrivers: [], fareBreakdown: fareData.breakdown, message: "No drivers available with requested vehicle type" },
+            req,
+            true
+          )
+        );
+      }
 
-  //     let ride = await Ride.create({
-  //       rider: riderId,
-  //       driver: null,
-  //       pickupLocation,
-  //       dropLocation,
-  //       distance: Number(distanceKm.toFixed(2)),
-  //       estimatedFare: fareData.estimatedFare,
-  //       finalFare: 0,
-  //       vehicleType,
-  //       paymentMethod: paymentMethod || "cash",
-  //       status: "requested",
-  //     });
+      const nearbyDrivers = await Driver.find({
+        _id: { $in: driverIdsWithMatchingVehicle },
+        isAvailable: true,
+        registrationStatus: "approved",
+        status: "active",
+        location: {
+          $near: {
+            $geometry: {
+              type: "Point",
+              coordinates: [pickupLng, pickupLat]
+            },
+            $maxDistance: 5000
+          }
+        }
+      }).select("_id firstName lastName");
+      
+      if (nearbyDrivers.length > 0) {
+        nearbyDrivers.forEach(driver => {
+          sendRideToDriver(driver._id.toString(), ride);
+        });
+      }
 
-  //     const nearestDriver = await Driver.findOne({
-  //       isAvailable: true,
-  //       registrationStatus: "approved",
-  //       status: "active"
-  //     }).select("_id");
-
-  //     if (nearestDriver) {
-  //       ride.driver = nearestDriver._id;
-  //       await ride.save();
-  //       const ok = sendRideToDriver(nearestDriver._id.toString(), ride);
-  //       console.log("sendRideToDriver result:", ok);
-  //     } else {
-  //       console.log("No available drivers to auto-assign");
-  //     }
-
-  //     return res.json(responseData("RIDE_CREATED", { ride, fareBreakdown: fareData.breakdown }, req, true));
-  //   } catch (err) {
-  //     console.error("createRide err:", err);
-  //     return res.json(responseData(err.message || "SERVER_ERROR", {}, req, false));
-  //   }
-  // },
-createRide: async (req, res) => {
-  try {
-    const { pickupLocation, dropLocation, vehicleType, paymentMethod } = req.body;
-
-    const riderId = req.user?._id;
-    if (!riderId) {
-      return res.json(responseData("NOT_AUTHORIZED", {}, req, false));
-    }
-
-    if (!pickupLocation?.coordinates || !dropLocation?.coordinates) {
-      return res.json(responseData("LOCATIONS_REQUIRED", {}, req, false));
-    }
-
-    const [pickupLng, pickupLat] = pickupLocation.coordinates;
-    const [dropLng, dropLat] = dropLocation.coordinates;
-    const distanceKm = calculateDistanceInKm(pickupLat, pickupLng, dropLat, dropLng);
-    const fareData = calculateFare(distanceKm);
-
-    const ride = await Ride.create({
-      rider: riderId,
-      driver: null,
-      pickupLocation,
-      dropLocation,
-      distance: Number(distanceKm.toFixed(2)),
-      estimatedFare: fareData.estimatedFare,
-      finalFare: 0,
-      vehicleType,
-      paymentMethod: paymentMethod || "cash",
-      status: "requested"
-    });
-
-    // Normalize vehicle type for matching (ride uses "prime sedan", vehicle uses "prime-sedan")
-    const normalizedVehicleType = vehicleType === "prime sedan" ? "prime-sedan" : vehicleType;
-    
-    // Find drivers with matching vehicle type
-    const vehiclesWithMatchingType = await Vehicle.find({
-      type: normalizedVehicleType,
-      status: "active"
-    }).select("driver").lean();
-    
-    const driverIdsWithMatchingVehicle = vehiclesWithMatchingType.map(v => v.driver);
-    
-    console.log(`🔍 Found ${driverIdsWithMatchingVehicle.length} drivers with vehicle type ${normalizedVehicleType}`);
-    
-    if (driverIdsWithMatchingVehicle.length === 0) {
       return res.json(
         responseData(
           "RIDE_CREATED",
-          { ride, nearbyDrivers: [], fareBreakdown: fareData.breakdown, message: "No drivers available with requested vehicle type" },
+          { ride, nearbyDrivers, fareBreakdown: fareData.breakdown },
           req,
           true
         )
       );
+    } catch (err) {
+      return res.json(responseData(err.message || "SERVER_ERROR", {}, req, false));
     }
-
-    const nearbyDrivers = await Driver.find({
-      _id: { $in: driverIdsWithMatchingVehicle },
-      isAvailable: true,
-      registrationStatus: "approved",
-      status: "active",
-      location: {
-        $near: {
-          $geometry: {
-            type: "Point",
-            coordinates: [pickupLng, pickupLat]
-          },
-          $maxDistance: 5000
-        }
-      }
-    }).select("_id firstName lastName");
-    
-    console.log(`📍 Found ${nearbyDrivers.length} nearby drivers within 5km`);
-    
-    if (nearbyDrivers.length > 0) {
-      nearbyDrivers.forEach(driver => {
-        console.log(`📤 Attempting to send ride to driver ${driver._id}`);
-        const sent = sendRideToDriver(driver._id.toString(), ride);
-        console.log(`📤 Send result for driver ${driver._id}: ${sent}`);
-      });
-    }
-
-    return res.json(
-      responseData(
-        "RIDE_CREATED",
-        { ride, nearbyDrivers, fareBreakdown: fareData.breakdown },
-        req,
-        true
-      )
-    );
-  } catch (err) {
-    return res.json(responseData(err.message || "SERVER_ERROR", {}, req, false));
-  }
-},
+  },
 
   nearbyDrivers: async (req, res) => {
     try {
@@ -238,7 +179,6 @@ createRide: async (req, res) => {
     ride.cancelledAt = new Date();
     await ride.save();
 
-    // Set driver as available when ride is cancelled by user
     if (ride.driver) {
       await Driver.findByIdAndUpdate(ride.driver, { isAvailable: true });
       sendRideToDriver(ride.driver.toString(), { 

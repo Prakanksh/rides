@@ -87,6 +87,11 @@ const RideSchema = new mongoose.Schema(
     startedAt: { type: Date, default: null },
     completedAt: { type: Date, default: null },
 
+    estimatedTime: { type: Number, default: 0 },
+    actualTime: { type: Number, default: 0 },
+    actualArrivalTime: { type: Date, default: null },
+    actualCompletionTime: { type: Date, default: null },
+
     paidToDriver: {
       type: Boolean,
       default: false
@@ -135,6 +140,18 @@ RideSchema.methods.updatePaymentStatus = function() {
   this.paymentDetails.userPaidAmount = Number(this.paymentDetails.userPaidAmount.toFixed(2));
   this.paymentDetails.driverReceivedAmount = Number(this.paymentDetails.driverReceivedAmount.toFixed(2));
   this.paymentDetails.adminCommissionAmount = Number(this.paymentDetails.adminCommissionAmount.toFixed(2));
+};
+
+RideSchema.methods.getEstimatedArrivalTime = function() {
+  if (!this.createdAt) return null;
+  const { DRIVER_ARRIVAL_BUFFER_MINUTES } = require("../helpers/etaCalculator");
+  return new Date(this.createdAt.getTime() + (DRIVER_ARRIVAL_BUFFER_MINUTES * 60 * 1000));
+};
+
+RideSchema.methods.getEstimatedCompletionTime = function() {
+  const estimatedArrivalTime = this.getEstimatedArrivalTime();
+  if (!estimatedArrivalTime || !this.estimatedTime) return null;
+  return new Date(estimatedArrivalTime.getTime() + (this.estimatedTime * 60 * 1000));
 };
 
 RideSchema.index({ pickupLocation: "2dsphere" });

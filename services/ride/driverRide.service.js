@@ -5,6 +5,7 @@ const User = require("../../models/user.model");
 const { responseData } = require("../../helpers/responseData");
 const { ensureWallets, payByWallet, payByCash, confirmCashPayment } = require("../../helpers/walletUtil");
 const { sendToUser, sendRideToDriver } = require("../../socket/emitRide");
+const { calculateActualTime } = require("../../helpers/etaCalculator");
 
 const genOtp = () => String(Math.floor(1000 + Math.random() * 9000));
 
@@ -107,6 +108,7 @@ module.exports = {
       return res.json(responseData("RIDE_NOT_IN_ACCEPTED_STATE", {}, req, false));
 
     ride.status = "arrived";
+    ride.actualArrivalTime = new Date();
     ride.updatedAt = new Date();
     await ride.save();
 
@@ -153,6 +155,13 @@ module.exports = {
 
       const finalFare = ride.finalFare || ride.estimatedFare;
       ride.status = "reachedDestination";
+      
+      if (ride.startedAt) {
+        const now = new Date();
+        ride.actualTime = calculateActualTime(ride.startedAt, now);
+        ride.actualCompletionTime = now;
+      }
+      
       await ride.save();
 
       await ensureWallets(ride.rider, req.user._id);
