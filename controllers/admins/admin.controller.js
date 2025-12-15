@@ -1,3 +1,4 @@
+const { create } = require('lodash')
 const { responseData } = require('../../helpers/responseData')
 const adminService = require('../../services/admins/admin.services')
 module.exports = {
@@ -116,4 +117,11 @@ updateSupportStatus : async (req, res) => {
       return res.status(422).json(responseData(msg, {}, req))
     }
   },
+  createPromoCode: async (req, res) => {
+    try {
+      await adminService.createPromoCode(req, res)
+    } catch (err) {
+      const msg = err.message || 'SOMETHING_WENT_WRONG'
+      return res.status(422).json(responseData(msg, {}, req))
+    }}
 }
