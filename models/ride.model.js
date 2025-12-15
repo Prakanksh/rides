@@ -1,5 +1,17 @@
 const mongoose = require("mongoose");
-
+const vehicleFareSchema = new mongoose.Schema({
+  
+  vehicleType: {
+    type: String,
+    enum: ['two-wheeler', 'auto', 'mini', 'prime-sedan', 'suv'],
+    required: true
+  },
+  estimatedFare: {
+    type: Number,
+    required: true,
+    min: 0
+  }
+},{ _id: false });
 const RideSchema = new mongoose.Schema(
   {
     driver: {
@@ -42,7 +54,8 @@ const RideSchema = new mongoose.Schema(
     },
 
     distance: { type: Number, default: 0 },
-    estimatedFare: { type: Number, default: 0 },
+    // estimatedFare: { type: Number, default: 0 },
+    estimatedFare:[vehicleFareSchema],
     finalFare: { type: Number, default: 0 },
     paymentMethod: {
       type: String,
@@ -53,12 +66,13 @@ const RideSchema = new mongoose.Schema(
     vehicleType: {
       type: String,
       enum: ["two-wheeler", "auto", "mini", "prime sedan", "suv"],
-      required: true
+      // required: true
     },
 
     status: {
       type: String,
       enum: [
+        "estimating",
         "requested", 
         "accepted", 
         "arrived", 
@@ -67,7 +81,7 @@ const RideSchema = new mongoose.Schema(
         "completed", 
         "cancelled"
       ],
-      default: "requested"
+      default: "estimating"
     },
 
     cancellationReason: { type: String, default: "" },
@@ -117,8 +131,11 @@ const RideSchema = new mongoose.Schema(
       driverReceivedAmount: { type: Number, default: 0 },
       adminCommissionAmount: { type: Number, default: 0 },
       paymentCompletedAt: { type: Date, default: null }
-    }
+    },  promoCode:{
+type: String,
   },
+  },
+
   { timestamps: true, versionKey: false }
 );
 
