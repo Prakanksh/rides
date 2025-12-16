@@ -287,12 +287,24 @@ module.exports = {
 
     const ride = await Ride.findOne({
       rider: userId,
-      status: { $in: ["estimating", "requested", "accepted", "arrived", "ongoing", "reachedDestination"] }
+      status: { $in: ["estimating", "scheduled", "scheduled_ready", "requested", "accepted", "arrived", "ongoing", "reachedDestination"] }
     });
 
     if (!ride) return res.json(responseData("NO_ACTIVE_RIDE", {}, req, true));
 
     return res.json(responseData("ACTIVE_RIDE", { ride }, req, true));
+  },
+
+  getScheduledRides: async (req, res) => {
+    const userId = req.user._id;
+
+    const rides = await Ride.find({
+      rider: userId,
+      isScheduled: true,
+      status: { $in: ["scheduled", "scheduled_ready", "requested", "accepted", "arrived", "ongoing", "reachedDestination"] }
+    }).sort({ scheduledFor: 1 });
+
+    return res.json(responseData("SCHEDULED_RIDES", { rides }, req, true));
   },
 
   scheduleRide: async (req, res) => {
@@ -316,7 +328,25 @@ module.exports = {
         return res.json(responseData("SCHEDULED_TIME_REQUIRED", {}, req, false));
       }
 
-      const scheduledTime = new Date(scheduledFor);
+      let scheduledTime;
+      if (typeof scheduledFor === 'string' && scheduledFor.includes('/')) {
+        const dateTimeRegex = /^(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2})$/;
+        const match = scheduledFor.trim().match(dateTimeRegex);
+        if (!match) {
+          return res.json(responseData("INVALID_DATE_FORMAT", {}, req, false));
+        }
+        const [, day, month, year, hour, minute] = match;
+        scheduledTime = new Date(`${year}-${month}-${day}T${hour}:${minute}:00`);
+        if (isNaN(scheduledTime.getTime())) {
+          return res.json(responseData("INVALID_DATE_FORMAT", {}, req, false));
+        }
+      } else {
+        scheduledTime = new Date(scheduledFor);
+        if (isNaN(scheduledTime.getTime())) {
+          return res.json(responseData("INVALID_DATE_FORMAT", {}, req, false));
+        }
+      }
+
       const now = new Date();
       const minTime = new Date(now.getTime() + 15 * 60 * 1000);
       const maxTime = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
@@ -424,7 +454,25 @@ module.exports = {
         return res.json(responseData("CANNOT_RESCHEDULE_ACTIVE_RIDE", {}, req, false));
       }
 
-      const scheduledTime = new Date(scheduledFor);
+      let scheduledTime;
+      if (typeof scheduledFor === 'string' && scheduledFor.includes('/')) {
+        const dateTimeRegex = /^(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2})$/;
+        const match = scheduledFor.trim().match(dateTimeRegex);
+        if (!match) {
+          return res.json(responseData("INVALID_DATE_FORMAT", {}, req, false));
+        }
+        const [, day, month, year, hour, minute] = match;
+        scheduledTime = new Date(`${year}-${month}-${day}T${hour}:${minute}:00`);
+        if (isNaN(scheduledTime.getTime())) {
+          return res.json(responseData("INVALID_DATE_FORMAT", {}, req, false));
+        }
+      } else {
+        scheduledTime = new Date(scheduledFor);
+        if (isNaN(scheduledTime.getTime())) {
+          return res.json(responseData("INVALID_DATE_FORMAT", {}, req, false));
+        }
+      }
+
       const now = new Date();
       const minTime = new Date(now.getTime() + 15 * 60 * 1000);
       const maxTime = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
