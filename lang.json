@@ -1026,6 +1026,23 @@
     },
     "ALL_FIELDS_REQUIRED":{
     "en": "All fields are required."
+    },
+    "PLAN_CREATED": {
+    "en": "Plan created successfully."
+    },
+    "INVALID_DISCOUNT_VALUE": {
+    "en": "Invalid discount value."
+    },
+    "PLAN_ALREADY_EXISTS": {
+    "en": "Plan with the same name already exists."
+    },
+    "ADMIN_SETTING_NOT_FOUND" :{
+    "en": "Admin setting not found."},
+    "PLAN_UPDATED":{
+    "en": "Plan updated successfully."
+    },
+    "PLAN_NOT_FOUND":{
+    "en": "Plan not found."
     }
 
 }

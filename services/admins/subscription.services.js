@@ -10,119 +10,192 @@ const {
 } = require('../../helpers/helper')
 const constant = require('../../helpers/constant')
 const { default: mongoose } = require('mongoose')
+const subscriptionModel = require('../../models/subscription.model')
+const adminSettingModel = require('../../models/adminSetting.model')
 
 module.exports = {
-  createSubscription: async (req, res) => {
-    try {
-      let {
-        name, description, price, duration, months
-      } = req.body;
-      name = name.trim().toLowerCase();
-      description = description.trim()
-      let descLimit = description.split(" ")
-      if (descLimit.length > 300) {
-        return res.json(responseData('LIMIT_REACHED', {}, req, false))
-      }
-      let subscriptionObj = {
-        name, description, price, duration, months
-      }
-      const subscription = await Subscription.findOne({ name });
-      if (subscription) {
-        return res.json(responseData('SUBSCRIPTION_ALREADY_EXIST', {}, req, false))
-      }
-      await Subscription.create(subscriptionObj);
-      return res.json(responseData('SUBSCRIPTION_CREATED', {}, req, true));
-    } catch (error) {
-      console.log('error', error)
-      return res.json(responseData('ERROR_OCCUR', error.message, req, false))
-    }
-  },
-  subscriptionList: async (req, res) => {
-    try {
-      let {
-        page,
-        pageSize,
-        keyword,
-        status,
-        sortKey,
-        sortType,
-        startDate,
-        endDate
-      } = req.query
-      let whereStatement = {}
-      let condition = {}
-      page = parseInt(page) || 1
-      const limit = parseInt(pageSize) || 10
-      filterByKeyword(whereStatement, keyword)
-      filterByStatus(whereStatement, status)
-      filterByDateRange(condition, startDate, endDate)
-      sortKey = req.query?.sortBy ? req.query?.sortBy : sortKey
-      const finalCondition = {
-        ...whereStatement,
-        ...condition
-      }
-      const sortPattern = { createdAt: -1 }
-      sortData(sortPattern, sortKey, sortType)
-      const aggregationPipeline = [
-        { $match: finalCondition },
-        { $sort: sortPattern },
-        ...getPaginationArray(parseInt(page), limit)
-      ]
-      let queryResult = await Subscription.aggregate(aggregationPipeline)
+ 
+  createSubscription : async (req, res) => {
+  try {
+    const { name, validityDays, price, benefits } = req.body;
 
+    const existing = await subscriptionModel.findOne({ name: name });
+    if (existing) {
+     
+       return res.json(responseData('PLAN_ALREADY_EXISTS', {}, req, false));
+    }
+  const adminSetting = await adminSettingModel
+      .findOne()
+      .select('commissionPercentage -_id');
+
+    if (!adminSetting) {
+      return res.json(responseData('ADMIN_SETTING_NOT_FOUND', {}, req, false));
+    }
+
+    const adminCommission = Number(adminSetting.commissionPercentage);
+
+    // Validate discount percentage must be LESS than admin commission
+    if (Number( benefits.rideDiscountPercent) >= adminCommission)
+     {
       return res.json(
         responseData(
-          'GET_LIST',
-          queryResult.length > 0
-            ? queryResult[0]
-            : constant.staticResponseForEmptyResult,
+          'INVALID_DISCOUNT_VALUE',
+          { message: `Discount must be less than admin commission (${adminCommission}%)` },
           req,
-          true
+          false
         )
-      )
-    } catch (error) {
-      console.log('error', error)
-      return res.json(responseData('ERROR_OCCUR', error.message, req, false))
+      );
     }
-  },
+
+      // if(admin)
+    const plan = await subscriptionModel.create({
+      name,
+      validityDays,
+      price,
+      benefits
+    });
+
+  
+     return res.json(responseData('PLAN_CREATED', plan, req, true));
+  } catch (err) {
+     return res.json(responseData("ERROR_OCCUR", err.message, req, false));
+  }
+},
+  
+
+subscriptionList: async (req, res) => {
+  try {
+    let {
+      page,
+      pageSize,
+      keyword,
+      status,
+      sortKey,
+      sortType,
+      startDate,
+      endDate
+    } = req.query;
+
+    page = parseInt(page) || 1;
+    const limit = parseInt(pageSize) || 10;
+
+    let whereStatement = {};
+    let condition = {};
+
+    if (keyword) {
+      whereStatement.$or = [
+        { name: { $regex: keyword, $options: "i" } },
+        { description: { $regex: keyword, $options: "i" } }
+      ];
+    }
+
+    // if (status === "active") whereStatement.active = true;
+    // if (status === "inactive") whereStatement.active = false;
+    
+if (status) {
+      whereStatement.status = status;
+    }
+    if (startDate || endDate) {
+      condition.createdAt = {};
+      if (startDate) condition.createdAt.$gte = new Date(startDate);
+      if (endDate) condition.createdAt.$lte = new Date(endDate);
+    }
+
+    const finalCondition = {
+      ...whereStatement,
+      ...condition
+    };
+
+
+    const sortPattern = {};
+    const allowedSortKeys = ["createdAt", "price", "validityDays", "name"];
+
+    if (allowedSortKeys.includes(sortKey)) {
+      sortPattern[sortKey] = sortType === "asc" ? 1 : -1;
+    } else {
+      sortPattern.createdAt = -1; 
+    }
+
+    const skip = (page - 1) * limit;
+
+    const aggregationPipeline = [
+      { $match: finalCondition },
+      { $sort: sortPattern },
+      {
+        $facet: {
+          meta: [
+            { $count: "total" },
+            {
+              $addFields: {
+                page,
+                pageSize: limit
+              }
+            }
+          ],
+          data: [
+            { $skip: skip },
+            { $limit: limit }
+          ]
+        }
+      }
+    ];
+
+    const result = await Subscription.aggregate(aggregationPipeline);
+
+    const response = {
+      meta: result[0].meta[0] || { total: 0, page, pageSize: limit },
+      data: result[0].data
+    };
+
+    return res.json(responseData("GET_LIST", response, req, true));
+  } catch (error) {
+    console.log("error", error);
+    return res.json(responseData("ERROR_OCCUR", error.message, req, false));
+  }
+},
 
   editSubscription: async (req, res) => {
-    try {
-      const { id } = req.params;
-      let {
-        name, description, price, duration, months
-      } = req.body;
-      name = name.trim().toLowerCase();
-      description = description.trim()
-      const checkSubs = await Subscription.findOne({ name, _id: { $ne: id } });
-      if (checkSubs) {
-        return res.json(responseData('SUBSCRIPTION_ALREADY_EXIST', {}, req, false))
-      }
-      let descLimit = description.split(" ")
-      if (descLimit.length > 300) {
-        return res.json(responseData('LIMIT_REACHED', {}, req, false))
-      }
+  try {
+    const { id } = req.params;
+    const { benefits } = req.body;
+const adminSetting = await adminSettingModel
+      .findOne()
+      .select('commissionPercentage -_id');
 
-      const updateData = {
-        name, description, price, duration, months
-      };
-
-      const subscription = await Subscription.findByIdAndUpdate(
-        id,
-        updateData,
-        { new: true, runValidators: true }
-      );
-
-      if (!subscription) {
-        return res.json(responseData('SUBSCRIPTION_NOT_FOUND', {}, req, false))
-      }
-
-      return res.json(responseData('SUBSCRIPTION_UPDATED', subscription, req, true));
-    } catch (error) {
-      console.log('error', error)
-      return res.json(responseData('ERROR_OCCUR', error.message, req, false))
+    if (!adminSetting) {
+      return res.json(responseData('ADMIN_SETTING_NOT_FOUND', {}, req, false));
     }
-  },
+
+    const adminCommission = Number(adminSetting.commissionPercentage);
+
+    // Validate discount percentage must be LESS than admin commission
+    if (Number( benefits.rideDiscountPercent) >= adminCommission)
+     {
+      return res.json(
+        responseData(
+          'INVALID_DISCOUNT_VALUE',
+          { message: `Discount must be less than admin commission (${adminCommission}%)` },
+          req,
+          false
+        )
+      );
+    }
+    const updated = await subscriptionModel.findByIdAndUpdate(
+      id,
+      req.body,
+      { new: true }
+    );
+
+    if (!updated) {
+       return res.json(responseData("PLAN_NOT_FOUND", error.message, req, false));
+   
+    }
+return res.json(responseData("PLAN_UPDATED",updated, req, true));
+  
+  } catch (err) {
+      return res.json(responseData('ERROR_OCCUR', err.message, req, false));
+  }
+},
   viewSubscription: async (req, res) => {
     try {
       const { id } = req.params;

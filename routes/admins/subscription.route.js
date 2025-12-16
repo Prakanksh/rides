@@ -6,8 +6,7 @@ const { verifyToken } = require('../../middlewares/verifyToken')
 router
   .post('/', [verifyToken], validationRule.validate('create-subscription'), controller.createSubscription)
   .get('/', [verifyToken], controller.subscriptionList)
-  .post('/:id', [verifyToken], validationRule.validate('create-subscription'), controller.editSubscription)
+  .put('/:id', [verifyToken], validationRule.validate('update-subscription'), controller.editSubscription)
   .get('/:id', [verifyToken], controller.viewSubscription)
   .put('/update-status/:id', [verifyToken], controller.statusChange)
-
 module.exports = router

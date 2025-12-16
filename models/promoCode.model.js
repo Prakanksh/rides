@@ -7,11 +7,7 @@ const PromoCodeSchema = new mongoose.Schema(
     discountType: { type: String, enum: ["flat", "percentage"], required: true },
     discountValue: { type: Number, required: true },
 
-    // validFor: {
-    //   type: String,
-    //   enum: ["user", "driver"],  // separated promos
-    //   required: true,
-    // },
+   
     description: { type: String, default: "" },
 maxDiscountValue: { type: Number, default: 0 }, // applicable for percentage type
     expiryDate: { type: Date, required: true },
