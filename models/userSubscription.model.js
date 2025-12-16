@@ -1,6 +1,8 @@
+const { default: mongoose } = require("mongoose");
+
 const UserSubscriptionSchema = new mongoose.Schema({
   user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
-  plan: { type: mongoose.Schema.Types.ObjectId, ref: "SubscriptionPlan", required: true },
+  plan: { type: mongoose.Schema.Types.ObjectId, ref: "Subscription", required: true },
 
   startDate: Date,
   endDate: Date,

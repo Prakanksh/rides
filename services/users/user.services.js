@@ -35,6 +35,10 @@ const Country = require('../../models/countries.model')
 const Notification = require('../../models/notification.model')
 const SubCategory = require('../../models/subCategory.model')
 const supportModel = require('../../models/support.model')
+const subscriptionModel = require('../../models/subscription.model')
+const Transaction = require('../../models/transactions.model')
+const userSubscriptionModel = require('../../models/userSubscription.model')
+const Admin = require('../../models/admin.model')
 module.exports = {
   refreshToken: async (req, res) => {
     try {
@@ -1293,9 +1297,150 @@ const {candidateId} = req.params
     console.error("Support Create Error:", err);
       return res.json(responseData('ERROR_OCCUR', err.message, req, false))
   }
-}
-}
+},
+subscriptionList: async (req, res) => {
+  try {
+    let {
+      page,
+      pageSize,
+      keyword,
+      status,
+      sortKey,
+      sortType,
+      startDate,
+      endDate
+    } = req.query;
 
+    page = parseInt(page) || 1;
+    const limit = parseInt(pageSize) || 10;
+
+    let whereStatement = {};
+    let condition = {};
+
+    if (keyword) {
+      whereStatement.$or = [
+        { name: { $regex: keyword, $options: "i" } },
+        { description: { $regex: keyword, $options: "i" } }
+      ];
+    }
+
+if (status) {
+      whereStatement.status = status;
+    }
+    if (startDate || endDate) {
+      condition.createdAt = {};
+      if (startDate) condition.createdAt.$gte = new Date(startDate);
+      if (endDate) condition.createdAt.$lte = new Date(endDate);
+    }
+
+    const finalCondition = {
+      isDeleted: false,
+      ...whereStatement,
+      ...condition
+    };
+
+
+    const sortPattern = {};
+    const allowedSortKeys = ["createdAt", "price", "validityDays", "name"];
+
+    if (allowedSortKeys.includes(sortKey)) {
+      sortPattern[sortKey] = sortType === "asc" ? 1 : -1;
+    } else {
+      sortPattern.createdAt = -1; 
+    }
+
+    const skip = (page - 1) * limit;
+
+    const aggregationPipeline = [
+      { $match: finalCondition },
+      { $sort: sortPattern },
+      {
+        $facet: {
+          meta: [
+            { $count: "total" },
+            {
+              $addFields: {
+                page,
+                pageSize: limit
+              }
+            }
+          ],
+          data: [
+            { $skip: skip },
+            { $limit: limit }
+          ]
+        }
+      }
+    ];
+
+    const result = await subscriptionModel.aggregate(aggregationPipeline);
+
+    const response = {
+      meta: result[0].meta[0] || { total: 0, page, pageSize: limit },
+      data: result[0].data
+    };
+
+    return res.json(responseData("GET_LIST", response, req, true));
+  } catch (error) {
+    console.log("error", error);
+    return res.json(responseData("ERROR_OCCUR", error.message, req, false));
+  }
+},
+buySubscription : async (req, res) => {
+  try {
+    const userId = req.user._id;          // From auth middleware
+    const { planId } = req.params;
+
+    // 1. Check plan exists
+    const plan = await subscriptionModel.findOne({ _id: planId, active: true });
+    console.log(plan)
+    if (!plan) {
+      return res.json(responseData("PLAN_NOT_FOUND_OR_INACTIVE", {}, req, false));
+    }
+    const adminId =await Admin.findOne({role: "admin"}).select("_id");
+
+    // 2. Create PENDING transaction
+    const transaction = await Transaction.create({
+      paidBy: "user",
+      paidTo: "admin",
+      paidById: userId,
+      paidToId: adminId._id,
+      paymentMethod: "online",       // or "manual" as placeholder
+
+      transactionType: "subscription_payment",
+      amount: plan.price,
+      totalAmount: plan.price,
+      currency: "INR",
+      status: "pending",             // IMPORTANT
+    });
+
+    // 3. Create UserSubscription with inactive state
+    const startDate = new Date();          // activate only after payment confirmation
+    const endDate = moment(startDate).add(plan.validityDays, "days");
+
+    const userSubscription = await userSubscriptionModel.create({
+      user: userId,
+      plan: plan._id,
+      startDate,
+      endDate,
+      isActive: false,               // IMPORTANT
+      usedRides: 0,
+      freeRidesUsed: 0
+    });
+
+    return res.json(
+      responseData("SUBSCRIPTION_PURCHASE_PENDING", {
+        transaction,
+        userSubscription
+      }, req, true)
+    );
+
+  } catch (err) {
+    console.log(err);
+    return res.status(500).json(responseData("ERROR_OCCURED", err.message, req, false));
+  }
+}
+}
 const handleSocialRegistration = async (
   registrationType,
   accessToken,

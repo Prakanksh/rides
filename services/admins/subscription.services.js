@@ -12,6 +12,8 @@ const constant = require('../../helpers/constant')
 const { default: mongoose } = require('mongoose')
 const subscriptionModel = require('../../models/subscription.model')
 const adminSettingModel = require('../../models/adminSetting.model')
+const Transaction = require('../../models/transactions.model')
+const userSubscriptionModel = require('../../models/userSubscription.model')
 
 module.exports = {
  
@@ -102,6 +104,7 @@ if (status) {
     }
 
     const finalCondition = {
+      isDeleted: false,
       ...whereStatement,
       ...condition
     };
@@ -231,5 +234,70 @@ return res.json(responseData("PLAN_UPDATED",updated, req, true));
     } catch (error) {
       return res.json(responseData('ERROR_OCCUR', error.message, req, false))
     }
-  },
-};
+  },deleteSubscription: async (req, res) => {
+    try {
+      const { id } = req.params;
+      if (!mongoose.Types.ObjectId.isValid(id)) {
+        return res.json(responseData('SUBSCRIPTION_NOT_FOUND', {}, req, false));
+      } 
+      const subscription = await Subscription.findByIdAndUpdate(id, { isDeleted: true }, { new: true });
+
+      if (!subscription) {
+        return res.json(responseData('SUBSCRIPTION_NOT_FOUND', {}, req, false));
+      }
+      return res.json(responseData('SUBSCRIPTION_DELETED', subscription, req, true));
+    } catch (error) {
+      console.log('error', error);
+      return res.json(responseData('ERROR_OCCUR', error.message, req, false));
+    }},
+    updateSubscriptionPayment : async (req, res) => {
+  try {
+    const {  status } = req.body;
+
+    const txn = await Transaction.findOne({ _id:req.params.txnId });
+    if (!txn) {
+      return res.json(responseData("TRANSACTION_NOT_FOUND", {}, req, false));
+    }
+
+    // find user's pending subscription
+    const userSubscription = await userSubscriptionModel.findOne({
+      user: txn.paidById,
+  
+    
+    }).populate("plan");
+
+    if (!userSubscription) {
+      return res.json(responseData("SUBSCRIPTION_NOT_FOUND", {}, req, false));
+    }
+
+    if (status === "completed") {
+      // 1. Mark transaction completed
+      txn.status = "completed";
+      await txn.save();
+
+      // // 2. Activate subscription
+      // const start = new Date();
+      // const end = moment(start).add(userSubscription.plan.validityDays, "days");
+
+      // userSubscription.startDate = start;
+      // userSubscription.endDate = end;
+      userSubscription.isActive = true;
+      await userSubscription.save();
+
+      return res.json(
+        responseData("SUBSCRIPTION_ACTIVATED", userSubscription, req, true)
+      );
+    }
+
+    // If reject:
+    txn.status = "failed";
+    await txn.save();
+
+    return res.json(responseData("PAYMENT_REJECTED", {}, req, true));
+
+  } catch (err) {
+    console.log(err);
+    return res.status(500).json(responseData("ERROR_OCCURED", err.message, req, false));
+  }
+}
+}

@@ -42,7 +42,9 @@ const {
   subCategoryListMasterData,
   verifyOtpMobileSocialSignUp,
   sendOtpMobileSocialSignUp,
-  createSupport
+  createSupport,
+  subcriptions,
+  buySubscription
 } = require('../../controllers/users/user.controller')
 const { submitSupportRequest } = require('../../services/users/user.services')
 
@@ -130,6 +132,6 @@ router
   .get('/notification-favorite-count', [verifyToken], notificationAndFavoriteCount)
   .get('/sub-category-list', [], subCategoryListMasterData)
     .post('/support/:candidateId', [verifyToken], createSupport )
-
-  // .post('/user-document', [], userDocs.uploadDocuments)
+.get("/subscriptions", [verifyToken], subcriptions)
+  .post('/buy-subscription/:planId', [verifyToken], buySubscription)
 module.exports = router

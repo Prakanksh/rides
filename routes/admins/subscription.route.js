@@ -8,5 +8,7 @@ router
   .get('/', [verifyToken], controller.subscriptionList)
   .put('/:id', [verifyToken], validationRule.validate('update-subscription'), controller.editSubscription)
   .get('/:id', [verifyToken], controller.viewSubscription)
-  .put('/update-status/:id', [verifyToken], controller.statusChange)
+  // .put('/update-status/:id', [verifyToken], controller.statusChange)
+  .delete('/:id', [verifyToken], controller.deleteSubscription)
+  .put('/tx-status/:txnId', [verifyToken], controller.updateSubscriptionPayment)
 module.exports = router
