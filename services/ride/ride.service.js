@@ -3,52 +3,73 @@ const Driver = require("../../models/driver.model");
 const Vehicle = require("../../models/vehicle.model");
 const { responseData } = require("../../helpers/responseData");
 const { calculateDistanceInKm } = require("../../helpers/distance");
-const { calculateFare } = require("../../helpers/fareConfig");
+const { calculateFare, calculateAllVehicleFares } = require("../../helpers/fareConfig");
 const { sendRideToDriver, sendToUser } = require("../../socket/emitRide");
 const { calculateETA } = require("../../helpers/etaCalculator");
+const promoCodeModel = require("../../models/promoCode.model");
 
 module.exports = {
+  // New flow: User selects vehicle and creates ride (updates existing ride from estimate)
   createRide: async (req, res) => {
     try {
-      const { pickupLocation, dropLocation, vehicleType, paymentMethod } = req.body;
+      const { pickupLocation, dropLocation, vehicleType, paymentMethod, distanceKm, fare, promoCode } = req.body;
+      const { rideId } = req.params;
 
       const riderId = req.user?._id;
       if (!riderId) {
         return res.json(responseData("NOT_AUTHORIZED", {}, req, false));
       }
 
+      // Validate ride exists and belongs to user
+      const existingRide = await Ride.findOne({ _id: rideId, rider: riderId });
+      if (!existingRide) {
+        return res.json(responseData("RIDE_NOT_FOUND", {}, req, false));
+      }
+
+      // Validate required fields
       if (!pickupLocation?.coordinates || !dropLocation?.coordinates) {
         return res.json(responseData("LOCATIONS_REQUIRED", {}, req, false));
       }
 
+      if (!vehicleType) {
+        return res.json(responseData("VEHICLE_TYPE_REQUIRED", {}, req, false));
+      }
+
       const [pickupLng, pickupLat] = pickupLocation.coordinates;
       const [dropLng, dropLat] = dropLocation.coordinates;
-      const distanceKm = calculateDistanceInKm(pickupLat, pickupLng, dropLat, dropLng);
-      const fareData = calculateFare(distanceKm);
 
+      // Calculate ETA for the selected vehicle
       const etaData = await calculateETA({
         origin: [pickupLng, pickupLat],
         destination: [dropLng, dropLat],
         vehicleType,
-        distanceKm
+        distanceKm: distanceKm || existingRide.distance
       }, {
         useGoogleMaps: false
       });
 
-      const ride = await Ride.create({
-        rider: riderId,
-        driver: null,
-        pickupLocation,
-        dropLocation,
-        distance: Number(distanceKm.toFixed(2)),
-        estimatedFare: fareData.estimatedFare,
-        finalFare: 0,
-        vehicleType,
-        paymentMethod: paymentMethod || "cash",
-        status: "requested",
-        estimatedTime: etaData.estimatedTime
-      });
+      // Update ride with vehicle selection and other details
+      const ride = await Ride.findByIdAndUpdate(
+        rideId,
+        {
+          pickupLocation,
+          dropLocation,
+          distance: Number((distanceKm || existingRide.distance).toFixed(2)),
+          finalFare: fare || 0,
+          vehicleType,
+          paymentMethod: paymentMethod || "cash",
+          status: "requested",
+          promoCode: promoCode || null,
+          estimatedTime: etaData.estimatedTime
+        },
+        { new: true }
+      );
 
+      if (!ride) {
+        return res.json(responseData("RIDE_UPDATE_FAILED", {}, req, false));
+      }
+
+      // Find drivers with matching vehicle type
       const normalizedVehicleType = vehicleType === "prime sedan" ? "prime-sedan" : vehicleType;
       const vehiclesWithMatchingType = await Vehicle.find({
         type: normalizedVehicleType,
@@ -61,13 +82,14 @@ module.exports = {
         return res.json(
           responseData(
             "RIDE_CREATED",
-            { ride, nearbyDrivers: [], fareBreakdown: fareData.breakdown, message: "No drivers available with requested vehicle type" },
+            { ride, nearbyDrivers: [], message: "No drivers available with requested vehicle type" },
             req,
             true
           )
         );
       }
 
+      // Find nearby available drivers
       const nearbyDrivers = await Driver.find({
         _id: { $in: driverIdsWithMatchingVehicle },
         isAvailable: true,
@@ -84,6 +106,7 @@ module.exports = {
         }
       }).select("_id firstName lastName");
       
+      // Send ride to all nearby drivers
       if (nearbyDrivers.length > 0) {
         nearbyDrivers.forEach(driver => {
           sendRideToDriver(driver._id.toString(), ride);
@@ -93,12 +116,109 @@ module.exports = {
       return res.json(
         responseData(
           "RIDE_CREATED",
-          { ride, nearbyDrivers, fareBreakdown: fareData.breakdown },
+          { ride, nearbyDrivers, estimatedTime: etaData.estimatedTime },
           req,
           true
         )
       );
     } catch (err) {
+      console.error("createRide error:", err);
+      return res.json(responseData(err.message || "SERVER_ERROR", {}, req, false));
+    }
+  },
+
+  // Step 1: User estimates ride with just pickup and drop location (no vehicle type)
+  estimateRide: async (req, res) => {
+    try {
+      const { pickupLocation, dropLocation } = req.body;
+
+      const riderId = req.user?._id;
+      if (!riderId) {
+        return res.json(responseData("NOT_AUTHORIZED", {}, req, false));
+      }
+
+      if (!pickupLocation?.coordinates || !dropLocation?.coordinates) {
+        return res.json(responseData("LOCATIONS_REQUIRED", {}, req, false));
+      }
+
+      const [pickupLng, pickupLat] = pickupLocation.coordinates;
+      const [dropLng, dropLat] = dropLocation.coordinates;
+      const distanceKm = calculateDistanceInKm(pickupLat, pickupLng, dropLat, dropLng);
+
+      // Calculate fare for all vehicle types
+      const fareData = await calculateAllVehicleFares(distanceKm);
+
+      // Create ride with status "estimating" (no vehicle type selected yet)
+      const ride = await Ride.create({
+        rider: riderId,
+        driver: null,
+        pickupLocation,
+        dropLocation,
+        distance: Number(distanceKm.toFixed(2)),
+        estimatedFare: fareData, // Array of fares for all vehicle types
+        status: "estimating"
+      });
+
+      return res.json(
+        responseData(
+          "RIDE_ESTIMATED",
+          { ride, allVehicleFares: fareData },
+          req,
+          true
+        )
+      );
+    } catch (err) {
+      console.error("estimateRide error:", err);
+      return res.json(responseData(err.message || "SERVER_ERROR", {}, req, false));
+    }
+  },
+
+  // Step 2: User applies promo code to get discount
+  applyPromo: async (req, res) => {
+    try {
+      const { code, userId, rideId } = req.body;
+
+      if (!code) {
+        return res.json(responseData("PROMO_CODE_REQUIRED", {}, req, false));
+      }
+
+      const promo = await promoCodeModel.findOne({ code, isActive: true });
+
+      if (!promo) {
+        return res.json(responseData("INVALID_PROMO_CODE", {}, req, false));
+      }
+
+      if (promo.expiryDate < new Date()) {
+        return res.json(responseData("PROMO_CODE_EXPIRED", {}, req, false));
+      }
+
+      // Check per-user usage limit
+      const usedBefore = promo.usageHistory.filter(
+        (e) => e.userId?.toString() === userId
+      ).length;
+
+      if (usedBefore >= promo.perUserLimit) {
+        return res.json(responseData("PROMO_CODE_ALREADY_USED", {}, req, false));
+      }
+
+      // Return discount information
+      const discountInfo = {
+        discountType: promo.discountType,
+        discountValue: promo.discountValue,
+        maxDiscountValue: promo.maxDiscountValue || 0,
+        code: promo.code
+      };
+
+      return res.json(
+        responseData(
+          "PROMO_CODE_APPLIED",
+          { discount: discountInfo, userId, rideId },
+          req,
+          true
+        )
+      );
+    } catch (err) {
+      console.error("applyPromo error:", err);
       return res.json(responseData(err.message || "SERVER_ERROR", {}, req, false));
     }
   },
@@ -110,8 +230,8 @@ module.exports = {
       if (!pickupLat || !pickupLng) {
         return res.json(responseData("COORDINATES_REQUIRED", {}, req, false));
       }
-         pickupLat = parseFloat(pickupLat);
-    pickupLng = parseFloat(pickupLng);
+      pickupLat = parseFloat(pickupLat);
+      pickupLng = parseFloat(pickupLng);
 
       const drivers = await Driver.find({
         isAvailable: true,
@@ -125,7 +245,6 @@ module.exports = {
         }
       }).select("firstName lastName mobile location");
 
-      
       return res.json(responseData("NEARBY_DRIVERS", { drivers }, req, true));
     } catch (err) {
       return res.json(responseData(err.message, {}, req, false));
@@ -150,7 +269,7 @@ module.exports = {
 
     const ride = await Ride.findOne({
       rider: userId,
-      status: { $in: ["requested", "accepted", "arrived", "ongoing", "reachedDestination"] }
+      status: { $in: ["estimating", "requested", "accepted", "arrived", "ongoing", "reachedDestination"] }
     });
 
     if (!ride) return res.json(responseData("NO_ACTIVE_RIDE", {}, req, true));

@@ -5,6 +5,13 @@ module.exports = {
   createRide: async (req, res) => {
     try { await rideService.createRide(req, res); } catch (err) { return res.json(responseData(err.message || "SOMETHING_WENT_WRONG", {}, req, false)); }
   },
+  estimateRide: async (req, res) => {
+    try { await rideService.estimateRide(req, res); } catch (err) { return res.json(responseData(err.message || "SOMETHING_WENT_WRONG", {}, req, false)); }
+  },
+   applyPromo: async (req, res) => {
+    try { await rideService.applyPromo(req, res); } catch (err) { return res.json(responseData(err.message || "SOMETHING_WENT_WRONG", {}, req, false)); }
+  },
+
 
   nearbyDrivers: async (req, res) => {
     try {

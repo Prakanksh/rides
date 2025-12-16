@@ -5,7 +5,11 @@ const { verifyToken } = require("../../middlewares/verifyToken");
 const rideController = require("../../controllers/users/ride.controller");
 
 // Create a new ride
-router.post("/create", verifyToken, rideController.createRide);
+router.post("/estimate", verifyToken, rideController.estimateRide);
+
+router.post("/create/:rideId", verifyToken, rideController.createRide);
+router.post("/apply-promo", verifyToken, rideController.applyPromo);
+
 // Get nearby drivers
 router.get("/nearby", verifyToken, rideController.nearbyDrivers);
 

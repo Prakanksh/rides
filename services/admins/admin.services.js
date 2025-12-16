@@ -24,6 +24,7 @@ const User = require('../../models/user.model')
 const supportModel = require('../../models/support.model')
 const { getSupportInquires, createPromoCode } = require('../../controllers/admins/admin.controller')
 const promoCodeModel = require('../../models/promoCode.model')
+const adminSettingModel = require('../../models/adminSetting.model')
 
 module.exports = {
   adminLogin: async (req, res) => {
@@ -398,14 +399,51 @@ updateSupportStatus: async (req, res) => {
     return res.json(responseData('ERROR_OCCUR', error.message, req, false))
   }
 },
-createPromoCode: async (req, res) => {  
-    try {
-      const promo = await promoCodeModel.create(req.body);
-      return res.json(responseData('PROMO_CREATED', promo, req, true))
-    } catch (err) {
-      const msg = err.message || 'SOMETHING_WENT_WRONG'
-      return res.status(422).json(responseData(msg, {}, req))
-    }   }
+createPromoCode: async (req, res) => {
+  try {
+    const { discountType, discountValue, code } = req.body;
+
+    const adminSetting = await adminSettingModel
+      .findOne()
+      .select('commissionPercentage -_id');
+
+    if (!adminSetting) {
+      return res.json(responseData('ADMIN_SETTING_NOT_FOUND', {}, req, false));
+    }
+
+    const adminCommission = Number(adminSetting.commissionPercentage);
+
+    // Validate discount percentage must be LESS than admin commission
+    if (
+      discountType === "percentage" &&
+      (isNaN(discountValue) || Number(discountValue) >= adminCommission)
+    ) {
+      return res.json(
+        responseData(
+          'INVALID_DISCOUNT_VALUE',
+          { message: `Discount must be less than admin commission (${adminCommission}%)` },
+          req,
+          false
+        )
+      );
+    }
+
+    // Check if promo code exists
+    const existingPromo = await promoCodeModel.findOne({ code });
+    if (existingPromo) {
+      return res.json(responseData('PROMO_CODE_EXISTS', {}, req, false));
+    }
+
+    const promo = await promoCodeModel.create(req.body);
+
+    return res.json(responseData('PROMO_CREATED', promo, req, true));
+
+  } catch (err) {
+    const msg = err.message || 'SOMETHING_WENT_WRONG';
+    return res.status(422).json(responseData(msg, {}, req));
+  }
+}
+
 }
 
 const isInvalidRequest = (type) => isEmpty(type)
