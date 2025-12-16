@@ -20,13 +20,11 @@ module.exports = {
         return res.json(responseData("NOT_AUTHORIZED", {}, req, false));
       }
 
-      // Validate ride exists and belongs to user
       const existingRide = await Ride.findOne({ _id: rideId, rider: riderId });
       if (!existingRide) {
         return res.json(responseData("RIDE_NOT_FOUND", {}, req, false));
       }
 
-      // Validate required fields
       if (!pickupLocation?.coordinates || !dropLocation?.coordinates) {
         return res.json(responseData("LOCATIONS_REQUIRED", {}, req, false));
       }
@@ -37,16 +35,36 @@ module.exports = {
 
       const [pickupLng, pickupLat] = pickupLocation.coordinates;
       const [dropLng, dropLat] = dropLocation.coordinates;
+      const distance = distanceKm || existingRide.distance;
 
-      // Calculate ETA for the selected vehicle
       const etaData = await calculateETA({
         origin: [pickupLng, pickupLat],
         destination: [dropLng, dropLat],
         vehicleType,
-        distanceKm: distanceKm || existingRide.distance
-      }, {
-        useGoogleMaps: false
+        distanceKm: distance
+      }, { useGoogleMaps: false });
+
+      const now = new Date();
+      const estimatedEndTime = new Date(now.getTime() + etaData.estimatedTime * 60 * 1000);
+
+      const scheduledRides = await Ride.find({
+        rider: riderId,
+        isScheduled: true,
+        status: { $in: ["scheduled", "scheduled_ready", "requested", "accepted", "arrived", "ongoing", "reachedDestination"] }
       });
+
+      const bufferMinutes = 15;
+      for (const scheduledRide of scheduledRides) {
+        const scheduledStartTime = scheduledRide.scheduledFor;
+        const scheduledEndTime = new Date(scheduledStartTime.getTime() + (scheduledRide.estimatedTime || 0) * 60 * 1000);
+
+        const timeDiff1 = Math.abs(estimatedEndTime - scheduledStartTime) / (1000 * 60);
+        const timeDiff2 = Math.abs(scheduledEndTime - now) / (1000 * 60);
+
+        if (timeDiff1 < bufferMinutes || timeDiff2 < bufferMinutes) {
+          return res.json(responseData("RIDE_TIME_CONFLICT", {}, req, false));
+        }
+      }
 
       // Update ride with vehicle selection and other details
       const ride = await Ride.findByIdAndUpdate(
@@ -275,6 +293,177 @@ module.exports = {
     if (!ride) return res.json(responseData("NO_ACTIVE_RIDE", {}, req, true));
 
     return res.json(responseData("ACTIVE_RIDE", { ride }, req, true));
+  },
+
+  scheduleRide: async (req, res) => {
+    try {
+      const { pickupLocation, dropLocation, vehicleType, paymentMethod, scheduledFor, distanceKm, fare, promoCode } = req.body;
+      const riderId = req.user?._id;
+
+      if (!riderId) {
+        return res.json(responseData("NOT_AUTHORIZED", {}, req, false));
+      }
+
+      if (!pickupLocation?.coordinates || !dropLocation?.coordinates) {
+        return res.json(responseData("LOCATIONS_REQUIRED", {}, req, false));
+      }
+
+      if (!vehicleType) {
+        return res.json(responseData("VEHICLE_TYPE_REQUIRED", {}, req, false));
+      }
+
+      if (!scheduledFor) {
+        return res.json(responseData("SCHEDULED_TIME_REQUIRED", {}, req, false));
+      }
+
+      const scheduledTime = new Date(scheduledFor);
+      const now = new Date();
+      const minTime = new Date(now.getTime() + 15 * 60 * 1000);
+      const maxTime = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+
+      if (scheduledTime <= now) {
+        return res.json(responseData("SCHEDULED_TIME_PAST", {}, req, false));
+      }
+
+      if (scheduledTime < minTime) {
+        return res.json(responseData("SCHEDULED_TIME_TOO_SOON", {}, req, false));
+      }
+
+      if (scheduledTime > maxTime) {
+        return res.json(responseData("SCHEDULED_TIME_TOO_FAR", {}, req, false));
+      }
+
+      const [pickupLng, pickupLat] = pickupLocation.coordinates;
+      const [dropLng, dropLat] = dropLocation.coordinates;
+      const distance = distanceKm || calculateDistanceInKm(pickupLat, pickupLng, dropLat, dropLng);
+
+      const etaData = await calculateETA({
+        origin: [pickupLng, pickupLat],
+        destination: [dropLng, dropLat],
+        vehicleType,
+        distanceKm: distance
+      }, { useGoogleMaps: false });
+
+      const activeRides = await Ride.find({
+        rider: riderId,
+        status: { $in: ["requested", "accepted", "arrived", "ongoing", "reachedDestination"] }
+      });
+
+      const scheduledRides = await Ride.find({
+        rider: riderId,
+        isScheduled: true,
+        status: { $in: ["scheduled", "scheduled_ready", "requested", "accepted", "arrived", "ongoing", "reachedDestination"] }
+      });
+
+      const allRides = [...activeRides, ...scheduledRides];
+      const bufferMinutes = 15;
+
+      for (const existingRide of allRides) {
+        let existingStartTime, existingEndTime;
+
+        if (existingRide.isScheduled) {
+          existingStartTime = existingRide.scheduledFor;
+          existingEndTime = new Date(existingStartTime.getTime() + (existingRide.estimatedTime || 0) * 60 * 1000);
+        } else {
+          existingStartTime = existingRide.createdAt;
+          existingEndTime = new Date(existingStartTime.getTime() + (existingRide.estimatedTime || 0) * 60 * 1000);
+        }
+
+        const newStartTime = scheduledTime;
+        const newEndTime = new Date(scheduledTime.getTime() + etaData.estimatedTime * 60 * 1000);
+
+        const timeDiff1 = Math.abs(newStartTime - existingEndTime) / (1000 * 60);
+        const timeDiff2 = Math.abs(newEndTime - existingStartTime) / (1000 * 60);
+
+        if (timeDiff1 < bufferMinutes || timeDiff2 < bufferMinutes) {
+          return res.json(responseData("RIDE_TIME_CONFLICT", {}, req, false));
+        }
+      }
+
+      const ride = await Ride.create({
+        rider: riderId,
+        pickupLocation,
+        dropLocation,
+        distance: Number(distance.toFixed(2)),
+        finalFare: fare || 0,
+        vehicleType,
+        paymentMethod: paymentMethod || "cash",
+        status: "scheduled",
+        isScheduled: true,
+        scheduledFor: scheduledTime,
+        scheduledAt: now,
+        reminderSent: false,
+        autoCancelled: false,
+        promoCode: promoCode || null,
+        estimatedTime: etaData.estimatedTime
+      });
+
+      return res.json(responseData("RIDE_SCHEDULED", { ride }, req, true));
+    } catch (err) {
+      console.error("scheduleRide error:", err);
+      return res.json(responseData(err.message || "SERVER_ERROR", {}, req, false));
+    }
+  },
+
+  rescheduleRide: async (req, res) => {
+    try {
+      const { rideId } = req.params;
+      const { scheduledFor } = req.body;
+      const riderId = req.user?._id;
+
+      if (!riderId) {
+        return res.json(responseData("NOT_AUTHORIZED", {}, req, false));
+      }
+
+      const ride = await Ride.findOne({ _id: rideId, rider: riderId, isScheduled: true });
+      if (!ride) {
+        return res.json(responseData("RIDE_NOT_FOUND", {}, req, false));
+      }
+
+      if (ride.status !== "scheduled") {
+        return res.json(responseData("CANNOT_RESCHEDULE_ACTIVE_RIDE", {}, req, false));
+      }
+
+      const scheduledTime = new Date(scheduledFor);
+      const now = new Date();
+      const minTime = new Date(now.getTime() + 15 * 60 * 1000);
+      const maxTime = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+
+      if (scheduledTime <= now || scheduledTime < minTime || scheduledTime > maxTime) {
+        return res.json(responseData("INVALID_SCHEDULED_TIME", {}, req, false));
+      }
+
+      const scheduledRides = await Ride.find({
+        rider: riderId,
+        _id: { $ne: rideId },
+        isScheduled: true,
+        status: { $in: ["scheduled", "scheduled_ready", "requested", "accepted", "arrived", "ongoing", "reachedDestination"] }
+      });
+
+      const bufferMinutes = 15;
+      for (const existingRide of scheduledRides) {
+        const existingStartTime = existingRide.scheduledFor;
+        const existingEndTime = new Date(existingStartTime.getTime() + (existingRide.estimatedTime || 0) * 60 * 1000);
+        const newStartTime = scheduledTime;
+        const newEndTime = new Date(scheduledTime.getTime() + ride.estimatedTime * 60 * 1000);
+
+        const timeDiff1 = Math.abs(newStartTime - existingEndTime) / (1000 * 60);
+        const timeDiff2 = Math.abs(newEndTime - existingStartTime) / (1000 * 60);
+
+        if (timeDiff1 < bufferMinutes || timeDiff2 < bufferMinutes) {
+          return res.json(responseData("RIDE_TIME_CONFLICT", {}, req, false));
+        }
+      }
+
+      ride.scheduledFor = scheduledTime;
+      ride.reminderSent = false;
+      await ride.save();
+
+      return res.json(responseData("RIDE_RESCHEDULED", { ride }, req, true));
+    } catch (err) {
+      console.error("rescheduleRide error:", err);
+      return res.json(responseData(err.message || "SERVER_ERROR", {}, req, false));
+    }
   },
 
   cancelRide: async (req, res) => {

@@ -42,7 +42,7 @@ module.exports = {
       const normalizedVehicleType = vehicle.type === "prime-sedan" ? "prime sedan" : vehicle.type;
 
       const baseQuery = {
-        status: "requested",
+        status: { $in: ["requested", "scheduled_ready"] },
         vehicleType: normalizedVehicleType,
         cancelledDrivers: { $ne: driverId }
       };

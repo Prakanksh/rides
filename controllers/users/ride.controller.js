@@ -44,5 +44,29 @@ module.exports = {
     } catch (err) {
       return res.json(responseData(err.message, {}, req, false));
     }
+  },
+
+  scheduleRide: async (req, res) => {
+    try {
+      await rideService.scheduleRide(req, res);
+    } catch (err) {
+      return res.json(responseData(err.message || "SOMETHING_WENT_WRONG", {}, req, false));
+    }
+  },
+
+  rescheduleRide: async (req, res) => {
+    try {
+      await rideService.rescheduleRide(req, res);
+    } catch (err) {
+      return res.json(responseData(err.message || "SOMETHING_WENT_WRONG", {}, req, false));
+    }
+  },
+
+  getScheduledRides: async (req, res) => {
+    try {
+      await rideService.getScheduledRides(req, res);
+    } catch (err) {
+      return res.json(responseData(err.message || "SOMETHING_WENT_WRONG", {}, req, false));
+    }
   }
 };
