@@ -5,7 +5,7 @@ const DriverDocumentSchema = new mongoose.Schema(
     driverId: {
       type: mongoose.Schema.Types.ObjectId,
       required: true,
-      ref: "User"
+      ref: "Driver"
     },
 
     documents: {

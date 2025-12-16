@@ -73,6 +73,8 @@ const RideSchema = new mongoose.Schema(
       type: String,
       enum: [
         "estimating",
+        "scheduled",
+        "scheduled_ready",
         "requested", 
         "accepted", 
         "arrived", 
@@ -84,10 +86,17 @@ const RideSchema = new mongoose.Schema(
       default: "estimating"
     },
 
+    isScheduled: { type: Boolean, default: false },
+    scheduledFor: { type: Date, default: null },
+    scheduledAt: { type: Date, default: null },
+    reminderSent: { type: Boolean, default: false },
+    autoCancelled: { type: Boolean, default: false },
+    scheduledReadyAt: { type: Date, default: null },
+
     cancellationReason: { type: String, default: "" },
     cancelledBy: {
       type: String,
-      enum: ["user", "driver", null],
+      enum: ["user", "driver", "system", null],
       default: null
     },
     cancelledAt: { type: Date, default: null },
@@ -100,6 +109,11 @@ const RideSchema = new mongoose.Schema(
 
     startedAt: { type: Date, default: null },
     completedAt: { type: Date, default: null },
+
+    estimatedTime: { type: Number, default: 0 },
+    actualTime: { type: Number, default: 0 },
+    actualArrivalTime: { type: Date, default: null },
+    actualCompletionTime: { type: Date, default: null },
 
     paidToDriver: {
       type: Boolean,
@@ -154,7 +168,22 @@ RideSchema.methods.updatePaymentStatus = function() {
   this.paymentDetails.adminCommissionAmount = Number(this.paymentDetails.adminCommissionAmount.toFixed(2));
 };
 
+RideSchema.methods.getEstimatedArrivalTime = function() {
+  if (!this.createdAt) return null;
+  const { DRIVER_ARRIVAL_BUFFER_MINUTES } = require("../helpers/etaCalculator");
+  return new Date(this.createdAt.getTime() + (DRIVER_ARRIVAL_BUFFER_MINUTES * 60 * 1000));
+};
+
+RideSchema.methods.getEstimatedCompletionTime = function() {
+  const estimatedArrivalTime = this.getEstimatedArrivalTime();
+  if (!estimatedArrivalTime || !this.estimatedTime) return null;
+  return new Date(estimatedArrivalTime.getTime() + (this.estimatedTime * 60 * 1000));
+};
+
 RideSchema.index({ pickupLocation: "2dsphere" });
 RideSchema.index({ dropLocation: "2dsphere" });
+RideSchema.index({ isScheduled: 1, status: 1, scheduledFor: 1 });
+RideSchema.index({ isScheduled: 1, status: 1, reminderSent: 1, scheduledFor: 1 });
+RideSchema.index({ isScheduled: 1, status: 1, scheduledReadyAt: 1, autoCancelled: 1 });
 
 module.exports = mongoose.model("Ride", RideSchema);

@@ -8,7 +8,7 @@ const NotificationSchema = new mongoose.Schema({
   },
   userType: {
     type: String,
-    ENUM: [ 'user', 'admin'],
+    enum: [ 'user', 'admin', 'driver'],
     default: 'user'
   },
   title: {

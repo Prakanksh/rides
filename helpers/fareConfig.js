@@ -151,14 +151,8 @@ const VEHICLE_MULTIPLIERS = {
 
 const calculateAllVehicleFares = async (distanceKm) => {
   try {
-    // const { distanceKm,} = req.body;
-// const  surgeMultiplier = 1;const  tip = 0 
-    // if (!distanceKm) {
-    //   return res.status(400).json({
-    //     success: false,
-    //     message: "distanceKm is required."
-    //   });
-    // }
+    const surgeMultiplier = 1; // Default surge multiplier
+    const tip = 0; // Default tip
 
     const results = [];
 

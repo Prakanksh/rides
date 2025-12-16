@@ -3,6 +3,7 @@ const Driver = require("../models/driver.model");
 const Admin = require("../models/admin.model");
 const Transaction = require("../models/transactions.model");
 const AdminSetting = require("../models/adminSetting.model");
+const { calculateActualTime } = require("./etaCalculator");
 
 async function computeShares(finalFare) {
   const settings = await AdminSetting.findOne({});
@@ -109,9 +110,14 @@ async function payByWallet(ride, userId, driverId, finalFare) {
   ride.updatePaymentStatus();
   ride.status = "completed";
   ride.completedAt = new Date();
+  
+  if (!ride.actualCompletionTime && ride.startedAt) {
+    ride.actualCompletionTime = ride.completedAt;
+    ride.actualTime = calculateActualTime(ride.startedAt, ride.completedAt);
+  }
+  
   await ride.save();
 
-  // Set driver as available when ride is completed
   if (driverId) {
     await Driver.findByIdAndUpdate(driverId, { isAvailable: true });
   }
@@ -184,9 +190,14 @@ async function payByCash(ride, userId, driverId, finalFare) {
   ride.updatePaymentStatus();
   ride.status = "completed";
   ride.completedAt = new Date();
+  
+  if (!ride.actualCompletionTime && ride.startedAt) {
+    ride.actualCompletionTime = ride.completedAt;
+    ride.actualTime = calculateActualTime(ride.startedAt, ride.completedAt);
+  }
+  
   await ride.save();
 
-  // Set driver as available when ride is completed
   if (driverId) {
     await Driver.findByIdAndUpdate(driverId, { isAvailable: true });
   }
@@ -253,9 +264,14 @@ async function confirmCashPayment(ride, userId, driverId, finalFare) {
   ride.updatePaymentStatus();
   ride.status = "completed";
   ride.completedAt = new Date();
+  
+  if (!ride.actualCompletionTime && ride.startedAt) {
+    ride.actualCompletionTime = ride.completedAt;
+    ride.actualTime = calculateActualTime(ride.startedAt, ride.completedAt);
+  }
+  
   await ride.save();
 
-  // Set driver as available when ride is completed
   if (driverId) {
     await Driver.findByIdAndUpdate(driverId, { isAvailable: true });
   }

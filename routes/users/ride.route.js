@@ -22,4 +22,13 @@ router.get("/active", verifyToken, rideController.getActiveRide);
 // Cancel a ride
 router.post("/cancel", verifyToken, rideController.cancelRide);
 
+// Schedule a ride
+router.post("/schedule", verifyToken, rideController.scheduleRide);
+
+// Reschedule a ride
+router.put("/reschedule/:rideId", verifyToken, rideController.rescheduleRide);
+
+// Get scheduled rides
+router.get("/scheduled", verifyToken, rideController.getScheduledRides);
+
 module.exports = router;

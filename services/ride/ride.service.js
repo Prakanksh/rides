@@ -5,330 +5,242 @@ const { responseData } = require("../../helpers/responseData");
 const { calculateDistanceInKm } = require("../../helpers/distance");
 const { calculateFare, calculateAllVehicleFares } = require("../../helpers/fareConfig");
 const { sendRideToDriver, sendToUser } = require("../../socket/emitRide");
-const { ApiGatewayManagementApi } = require("aws-sdk");
+const { calculateETA } = require("../../helpers/etaCalculator");
 const promoCodeModel = require("../../models/promoCode.model");
 
 module.exports = {
+  // New flow: User selects vehicle and creates ride (updates existing ride from estimate)
+  createRide: async (req, res) => {
+    try {
+      const { pickupLocation, dropLocation, vehicleType, paymentMethod, distanceKm, fare, promoCode } = req.body;
+      const { rideId } = req.params;
 
-  
-// createRide: async (req, res) => {
-//   try {
-//     const { pickupLocation, dropLocation, vehicleType, paymentMethod } = req.body;
+      const riderId = req.user?._id;
+      if (!riderId) {
+        return res.json(responseData("NOT_AUTHORIZED", {}, req, false));
+      }
 
-//     const riderId = req.user?._id;
-//     if (!riderId) {
-//       return res.json(responseData("NOT_AUTHORIZED", {}, req, false));
-//     }
+      const existingRide = await Ride.findOne({ _id: rideId, rider: riderId });
+      if (!existingRide) {
+        return res.json(responseData("RIDE_NOT_FOUND", {}, req, false));
+      }
 
-//     if (!pickupLocation?.coordinates || !dropLocation?.coordinates) {
-//       return res.json(responseData("LOCATIONS_REQUIRED", {}, req, false));
-//     }
+      if (!pickupLocation?.coordinates || !dropLocation?.coordinates) {
+        return res.json(responseData("LOCATIONS_REQUIRED", {}, req, false));
+      }
 
-//     const [pickupLng, pickupLat] = pickupLocation.coordinates;
-//     const [dropLng, dropLat] = dropLocation.coordinates;
-//     const distanceKm = calculateDistanceInKm(pickupLat, pickupLng, dropLat, dropLng);
-//     const fareData = calculateFare(distanceKm);
+      if (!vehicleType) {
+        return res.json(responseData("VEHICLE_TYPE_REQUIRED", {}, req, false));
+      }
 
-//     const ride = await Ride.create({
-//       rider: riderId,
-//       driver: null,
-//       pickupLocation,
-//       dropLocation,
-//       distance: Number(distanceKm.toFixed(2)),
-//       estimatedFare: fareData.estimatedFare,
-//       finalFare: 0,
-//       vehicleType,
-//       paymentMethod: paymentMethod || "cash",
-//       status: "requested"
-//     });
+      const [pickupLng, pickupLat] = pickupLocation.coordinates;
+      const [dropLng, dropLat] = dropLocation.coordinates;
+      const distance = distanceKm || existingRide.distance;
 
-//     // Normalize vehicle type for matching (ride uses "prime sedan", vehicle uses "prime-sedan")
-//     const normalizedVehicleType = vehicleType === "prime sedan" ? "prime-sedan" : vehicleType;
-    
-//     // Find drivers with matching vehicle type
-//     const vehiclesWithMatchingType = await Vehicle.find({
-//       type: normalizedVehicleType,
-//       status: "active"
-//     }).select("driver").lean();
-    
-//     const driverIdsWithMatchingVehicle = vehiclesWithMatchingType.map(v => v.driver);
-    
-//     console.log(`🔍 Found ${driverIdsWithMatchingVehicle.length} drivers with vehicle type ${normalizedVehicleType}`);
-    
-//     if (driverIdsWithMatchingVehicle.length === 0) {
-//       return res.json(
-//         responseData(
-//           "RIDE_CREATED",
-//           { ride, nearbyDrivers: [], fareBreakdown: fareData.breakdown, message: "No drivers available with requested vehicle type" },
-//           req,
-//           true
-//         )
-//       );
-//     }
+      const etaData = await calculateETA({
+        origin: [pickupLng, pickupLat],
+        destination: [dropLng, dropLat],
+        vehicleType,
+        distanceKm: distance
+      }, { useGoogleMaps: false });
 
-//     const nearbyDrivers = await Driver.find({
-//       _id: { $in: driverIdsWithMatchingVehicle },
-//       isAvailable: true,
-//       registrationStatus: "approved",
-//       status: "active",
-//       location: {
-//         $near: {
-//           $geometry: {
-//             type: "Point",
-//             coordinates: [pickupLng, pickupLat]
-//           },
-//           $maxDistance: 5000
-//         }
-//       }
-//     }).select("_id firstName lastName");
-    
-//     console.log(`📍 Found ${nearbyDrivers.length} nearby drivers within 5km`);
-    
-//     if (nearbyDrivers.length > 0) {
-//       nearbyDrivers.forEach(driver => {
-//         console.log(`📤 Attempting to send ride to driver ${driver._id}`);
-//         const sent = sendRideToDriver(driver._id.toString(), ride);
-//         console.log(`📤 Send result for driver ${driver._id}: ${sent}`);
-//       });
-//     }
+      const now = new Date();
+      const estimatedEndTime = new Date(now.getTime() + etaData.estimatedTime * 60 * 1000);
 
-//     return res.json(
-//       responseData(
-//         "RIDE_CREATED",
-//         { ride, nearbyDrivers, fareBreakdown: fareData.breakdown },
-//         req,
-//         true
-//       )
-//     );
-//   } catch (err) {
-//     return res.json(responseData(err.message || "SERVER_ERROR", {}, req, false));
-//   }
-// },
-createRide: async (req, res) => {
-  try {
-    const {pickupLocation,vehicleType, paymentMethod ,distanceKm,fare,promoCode} = req.body;
-const {rideId}=req.params;
-// console.log(pickupLocation,vehicleType, paymentMethod ,distanceKm,fare,promoCode,rideId)
-    const riderId = req.user?._id;
-    if (!riderId) {
-      return res.json(responseData("NOT_AUTHORIZED", {}, req, false));
-    }
+      const scheduledRides = await Ride.find({
+        rider: riderId,
+        isScheduled: true,
+        status: { $in: ["scheduled", "scheduled_ready", "requested", "accepted", "arrived", "ongoing", "reachedDestination"] }
+      });
 
- 
+      const bufferMinutes = 15;
+      for (const scheduledRide of scheduledRides) {
+        const scheduledStartTime = scheduledRide.scheduledFor;
+        const scheduledEndTime = new Date(scheduledStartTime.getTime() + (scheduledRide.estimatedTime || 0) * 60 * 1000);
 
-    const [pickupLng, pickupLat] = pickupLocation.coordinates;
+        const timeDiff1 = Math.abs(estimatedEndTime - scheduledStartTime) / (1000 * 60);
+        const timeDiff2 = Math.abs(scheduledEndTime - now) / (1000 * 60);
 
+        if (timeDiff1 < bufferMinutes || timeDiff2 < bufferMinutes) {
+          return res.json(responseData("RIDE_TIME_CONFLICT", {}, req, false));
+        }
+      }
 
-const ride = await Ride.findByIdAndUpdate(rideId, {
-      rider: riderId,
-      driver: null,
+      // Update ride with vehicle selection and other details
+      const ride = await Ride.findByIdAndUpdate(
+        rideId,
+        {
+          pickupLocation,
+          dropLocation,
+          distance: Number((distanceKm || existingRide.distance).toFixed(2)),
+          finalFare: fare || 0,
+          vehicleType,
+          paymentMethod: paymentMethod || "cash",
+          status: "requested",
+          promoCode: promoCode || null,
+          estimatedTime: etaData.estimatedTime
+        },
+        { new: true }
+      );
 
-      distance: Number(distanceKm.toFixed(2)),
-  
-      finalFare: fare,
-      vehicleType,
-      paymentMethod: paymentMethod || "cash",
-      status: "requested",
-      promoCode:promoCode
-    });
+      if (!ride) {
+        return res.json(responseData("RIDE_UPDATE_FAILED", {}, req, false));
+      }
 
+      // Find drivers with matching vehicle type
+      const normalizedVehicleType = vehicleType === "prime sedan" ? "prime-sedan" : vehicleType;
+      const vehiclesWithMatchingType = await Vehicle.find({
+        type: normalizedVehicleType,
+        status: "active"
+      }).select("driver").lean();
+      
+      const driverIdsWithMatchingVehicle = vehiclesWithMatchingType.map(v => v.driver);
+      
+      if (driverIdsWithMatchingVehicle.length === 0) {
+        return res.json(
+          responseData(
+            "RIDE_CREATED",
+            { ride, nearbyDrivers: [], message: "No drivers available with requested vehicle type" },
+            req,
+            true
+          )
+        );
+      }
 
-    const normalizedVehicleType = vehicleType === "prime sedan" ? "prime-sedan" : vehicleType;
-    
-    // Find drivers with matching vehicle type
-    const vehiclesWithMatchingType = await Vehicle.find({
-      type: normalizedVehicleType,
-      status: "active"
-    }).select("driver").lean();
-    
-    const driverIdsWithMatchingVehicle = vehiclesWithMatchingType.map(v => v.driver);
-    
-    console.log(`🔍 Found ${driverIdsWithMatchingVehicle.length} drivers with vehicle type ${normalizedVehicleType}`);
-    
-    if (driverIdsWithMatchingVehicle.length === 0) {
+      // Find nearby available drivers
+      const nearbyDrivers = await Driver.find({
+        _id: { $in: driverIdsWithMatchingVehicle },
+        isAvailable: true,
+        registrationStatus: "approved",
+        status: "active",
+        location: {
+          $near: {
+            $geometry: {
+              type: "Point",
+              coordinates: [pickupLng, pickupLat]
+            },
+            $maxDistance: 5000
+          }
+        }
+      }).select("_id firstName lastName");
+      
+      // Send ride to all nearby drivers
+      if (nearbyDrivers.length > 0) {
+        nearbyDrivers.forEach(driver => {
+          sendRideToDriver(driver._id.toString(), ride);
+        });
+      }
+
       return res.json(
         responseData(
           "RIDE_CREATED",
-          { ride, nearbyDrivers: [], fare, message: "No drivers available with requested vehicle type" },
+          { ride, nearbyDrivers, estimatedTime: etaData.estimatedTime },
           req,
           true
         )
       );
+    } catch (err) {
+      console.error("createRide error:", err);
+      return res.json(responseData(err.message || "SERVER_ERROR", {}, req, false));
     }
+  },
 
-    const nearbyDrivers = await Driver.find({
-      _id: { $in: driverIdsWithMatchingVehicle },
-      isAvailable: true,
-      registrationStatus: "approved",
-      status: "active",
-      location: {
-        $near: {
-          $geometry: {
-            type: "Point",
-            coordinates: [pickupLng, pickupLat]
-          },
-          $maxDistance: 5000
-        }
+  // Step 1: User estimates ride with just pickup and drop location (no vehicle type)
+  estimateRide: async (req, res) => {
+    try {
+      const { pickupLocation, dropLocation } = req.body;
+
+      const riderId = req.user?._id;
+      if (!riderId) {
+        return res.json(responseData("NOT_AUTHORIZED", {}, req, false));
       }
-    }).select("_id firstName lastName");
-    
-    console.log(`📍 Found ${nearbyDrivers.length} nearby drivers within 5km`);
-    
-    if (nearbyDrivers.length > 0) {
-      nearbyDrivers.forEach(driver => {
-        console.log(`📤 Attempting to send ride to driver ${driver._id}`);
-        const sent = sendRideToDriver(driver._id.toString(), ride);
-        console.log(`📤 Send result for driver ${driver._id}: ${sent}`);
+
+      if (!pickupLocation?.coordinates || !dropLocation?.coordinates) {
+        return res.json(responseData("LOCATIONS_REQUIRED", {}, req, false));
+      }
+
+      const [pickupLng, pickupLat] = pickupLocation.coordinates;
+      const [dropLng, dropLat] = dropLocation.coordinates;
+      const distanceKm = calculateDistanceInKm(pickupLat, pickupLng, dropLat, dropLng);
+
+      // Calculate fare for all vehicle types
+      const fareData = await calculateAllVehicleFares(distanceKm);
+
+      // Create ride with status "estimating" (no vehicle type selected yet)
+      const ride = await Ride.create({
+        rider: riderId,
+        driver: null,
+        pickupLocation,
+        dropLocation,
+        distance: Number(distanceKm.toFixed(2)),
+        estimatedFare: fareData, // Array of fares for all vehicle types
+        status: "estimating"
       });
+
+      return res.json(
+        responseData(
+          "RIDE_ESTIMATED",
+          { ride, allVehicleFares: fareData },
+          req,
+          true
+        )
+      );
+    } catch (err) {
+      console.error("estimateRide error:", err);
+      return res.json(responseData(err.message || "SERVER_ERROR", {}, req, false));
     }
+  },
 
-    return res.json(
-      responseData(
-        "RIDE_CREATED",
-        { ride, nearbyDrivers },
-        req,
-        true
-      )
-    );
-  } catch (err) {
-    return res.json(responseData(err.message || "SERVER_ERROR", {}, req, false));
-  }
-},
-estimateRide: async (req, res) => {
-  try {
-    const { pickupLocation, dropLocation, } = req.body;
+  // Step 2: User applies promo code to get discount
+  applyPromo: async (req, res) => {
+    try {
+      const { code, userId, rideId } = req.body;
 
-    const riderId = req.user?._id;
-    if (!riderId) {
-      return res.json(responseData("NOT_AUTHORIZED", {}, req, false));
+      if (!code) {
+        return res.json(responseData("PROMO_CODE_REQUIRED", {}, req, false));
+      }
+
+      const promo = await promoCodeModel.findOne({ code, isActive: true });
+
+      if (!promo) {
+        return res.json(responseData("INVALID_PROMO_CODE", {}, req, false));
+      }
+
+      if (promo.expiryDate < new Date()) {
+        return res.json(responseData("PROMO_CODE_EXPIRED", {}, req, false));
+      }
+
+      // Check per-user usage limit
+      const usedBefore = promo.usageHistory.filter(
+        (e) => e.userId?.toString() === userId
+      ).length;
+
+      if (usedBefore >= promo.perUserLimit) {
+        return res.json(responseData("PROMO_CODE_ALREADY_USED", {}, req, false));
+      }
+
+      // Return discount information
+      const discountInfo = {
+        discountType: promo.discountType,
+        discountValue: promo.discountValue,
+        maxDiscountValue: promo.maxDiscountValue || 0,
+        code: promo.code
+      };
+
+      return res.json(
+        responseData(
+          "PROMO_CODE_APPLIED",
+          { discount: discountInfo, userId, rideId },
+          req,
+          true
+        )
+      );
+    } catch (err) {
+      console.error("applyPromo error:", err);
+      return res.json(responseData(err.message || "SERVER_ERROR", {}, req, false));
     }
+  },
 
-    if (!pickupLocation?.coordinates || !dropLocation?.coordinates) {
-      return res.json(responseData("LOCATIONS_REQUIRED", {}, req, false));
-    }
-
-    const [pickupLng, pickupLat] = pickupLocation.coordinates;
-    const [dropLng, dropLat] = dropLocation.coordinates;
-    const distanceKm = calculateDistanceInKm(pickupLat, pickupLng, dropLat, dropLng);
-
-    const fareData = await calculateAllVehicleFares(distanceKm);
-        // const fareData = calculateFare(distanceKm);
-
-    
-// console.log(fareData,distanceKm)
-    const ride = await Ride.create({
-      rider: riderId,
-      driver: null,
-      pickupLocation,
-      dropLocation,
-      distance: Number(distanceKm.toFixed(2)),
-      estimatedFare: fareData,
-      // finalFare: 0,
-      // vehicleType,
-      // paymentMethod: paymentMethod || "cash",
-      // status: "requested"
-    });
-// console.log(ride)
-// return res.json(
-//      ride
-//     );  
-    // Normalize vehicle type for matching (ride uses "prime sedan", vehicle uses "prime-sedan")
-    // const normalizedVehicleType = vehicleType === "prime sedan" ? "prime-sedan" : vehicleType;
-    
-    // Find drivers with matching vehicle type
-    // const vehiclesWithMatchingType = await Vehicle.find({
-    //   type: normalizedVehicleType,
-    //   status: "active"
-    // }).select("driver").lean();
-    
-    // const driverIdsWithMatchingVehicle = vehiclesWithMatchingType.map(v => v.driver);
-    
-    // console.log(`🔍 Found ${driverIdsWithMatchingVehicle.length} drivers with vehicle type ${normalizedVehicleType}`);
-    
-    // if (driverIdsWithMatchingVehicle.length === 0) {
-    //   return res.json(
-    //     responseData(
-    //       "RIDE_CREATED",
-    //       { ride, nearbyDrivers: [], fareBreakdown: fareData.breakdown, message: "No drivers available with requested vehicle type" },
-    //       req,
-    //       true
-    //     )
-    //   );
-    // }
-
-    // const nearbyDrivers = await Driver.find({
-    //   _id: { $in: driverIdsWithMatchingVehicle },
-    //   isAvailable: true,
-    //   registrationStatus: "approved",
-    //   status: "active",
-    //   location: {
-    //     $near: {
-    //       $geometry: {
-    //         type: "Point",
-    //         coordinates: [pickupLng, pickupLat]
-    //       },
-    //       $maxDistance: 5000
-    //     }
-    //   }
-    // }).select("_id firstName lastName");
-    
-    // console.log(`📍 Found ${nearbyDrivers.length} nearby drivers within 5km`);
-    
-    // if (nearbyDrivers.length > 0) {
-    //   nearbyDrivers.forEach(driver => {
-    //     console.log(`📤 Attempting to send ride to driver ${driver._id}`);
-    //     const sent = sendRideToDriver(driver._id.toString(), ride);
-    //     console.log(`📤 Send result for driver ${driver._id}: ${sent}`);
-    //   });
-    // }
-
-    return res.json(
-      responseData(
-        "RIDE_CREATED",
-        { ride, },
-        req,
-        true
-      )
-    );
-  } catch (err) {
-    return res.json(responseData(err.message || "SERVER_ERROR", {}, req, false));
-  }
-},
-applyPromo: async (req, res) => {
-  const { code, userId,rideId } = req.body;
-// console.log(code,userId)
-  // const role = userId ? "user" : "driver";  // identify who is applying
-
-  const promo = await promoCodeModel.findOne({ code, isActive: true });
-
-  if (!promo) return res.status(404).json({ msg: "Invalid promo code" });
-
-  if (promo.expiryDate < new Date()) 
-    return res.status(400).json({ msg: "Promo code expired" });
-
-  // if (promo.usageLimit && promo.usedCount >= promo.usageLimit)
-  //   return res.status(400).json({ msg: "Promo usage limit reached" });
-
-  // check per-user-per-driver usage
-  const usedBefore = promo.usageHistory.filter(
-    (e) => (e.userId?.toString() === userId || e.driverId?.toString() === driverId)
-  ).length;
-
-  if (usedBefore >= promo.perUserLimit)
-    return res.status(400).json({ msg: "You already used this promo" });
-
-  // apply discount (just returning value)
-  let discount = promo.discountType === "percentage"
-    ? promo.discountValue + "%"
-    : promo.discountValue;
-
-  res.json({
-    msg: "Promo applied",
-    discount,
-    userId,
-    rideId
-  });
-},
   nearbyDrivers: async (req, res) => {
     try {
       let { pickupLat, pickupLng } = req.query;
@@ -336,8 +248,8 @@ applyPromo: async (req, res) => {
       if (!pickupLat || !pickupLng) {
         return res.json(responseData("COORDINATES_REQUIRED", {}, req, false));
       }
-         pickupLat = parseFloat(pickupLat);
-    pickupLng = parseFloat(pickupLng);
+      pickupLat = parseFloat(pickupLat);
+      pickupLng = parseFloat(pickupLng);
 
       const drivers = await Driver.find({
         isAvailable: true,
@@ -350,7 +262,6 @@ applyPromo: async (req, res) => {
           }
         }
       }).select("firstName lastName mobile location");
-
 
       return res.json(responseData("NEARBY_DRIVERS", { drivers }, req, true));
     } catch (err) {
@@ -376,12 +287,231 @@ applyPromo: async (req, res) => {
 
     const ride = await Ride.findOne({
       rider: userId,
-      status: { $in: ["requested", "accepted", "arrived", "ongoing", "reachedDestination"] }
+      status: { $in: ["estimating", "scheduled", "scheduled_ready", "requested", "accepted", "arrived", "ongoing", "reachedDestination"] }
     });
 
     if (!ride) return res.json(responseData("NO_ACTIVE_RIDE", {}, req, true));
 
     return res.json(responseData("ACTIVE_RIDE", { ride }, req, true));
+  },
+
+  getScheduledRides: async (req, res) => {
+    const userId = req.user._id;
+
+    const rides = await Ride.find({
+      rider: userId,
+      isScheduled: true,
+      status: { $in: ["scheduled", "scheduled_ready", "requested", "accepted", "arrived", "ongoing", "reachedDestination"] }
+    }).sort({ scheduledFor: 1 });
+
+    return res.json(responseData("SCHEDULED_RIDES", { rides }, req, true));
+  },
+
+  scheduleRide: async (req, res) => {
+    try {
+      const { pickupLocation, dropLocation, vehicleType, paymentMethod, scheduledFor, distanceKm, fare, promoCode } = req.body;
+      const riderId = req.user?._id;
+
+      if (!riderId) {
+        return res.json(responseData("NOT_AUTHORIZED", {}, req, false));
+      }
+
+      if (!pickupLocation?.coordinates || !dropLocation?.coordinates) {
+        return res.json(responseData("LOCATIONS_REQUIRED", {}, req, false));
+      }
+
+      if (!vehicleType) {
+        return res.json(responseData("VEHICLE_TYPE_REQUIRED", {}, req, false));
+      }
+
+      if (!scheduledFor) {
+        return res.json(responseData("SCHEDULED_TIME_REQUIRED", {}, req, false));
+      }
+
+      let scheduledTime;
+      if (typeof scheduledFor === 'string' && scheduledFor.includes('/')) {
+        const dateTimeRegex = /^(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2})$/;
+        const match = scheduledFor.trim().match(dateTimeRegex);
+        if (!match) {
+          return res.json(responseData("INVALID_DATE_FORMAT", {}, req, false));
+        }
+        const [, day, month, year, hour, minute] = match;
+        scheduledTime = new Date(`${year}-${month}-${day}T${hour}:${minute}:00`);
+        if (isNaN(scheduledTime.getTime())) {
+          return res.json(responseData("INVALID_DATE_FORMAT", {}, req, false));
+        }
+      } else {
+        scheduledTime = new Date(scheduledFor);
+        if (isNaN(scheduledTime.getTime())) {
+          return res.json(responseData("INVALID_DATE_FORMAT", {}, req, false));
+        }
+      }
+
+      const now = new Date();
+      const minTime = new Date(now.getTime() + 15 * 60 * 1000);
+      const maxTime = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+
+      if (scheduledTime <= now) {
+        return res.json(responseData("SCHEDULED_TIME_PAST", {}, req, false));
+      }
+
+      if (scheduledTime < minTime) {
+        return res.json(responseData("SCHEDULED_TIME_TOO_SOON", {}, req, false));
+      }
+
+      if (scheduledTime > maxTime) {
+        return res.json(responseData("SCHEDULED_TIME_TOO_FAR", {}, req, false));
+      }
+
+      const [pickupLng, pickupLat] = pickupLocation.coordinates;
+      const [dropLng, dropLat] = dropLocation.coordinates;
+      const distance = distanceKm || calculateDistanceInKm(pickupLat, pickupLng, dropLat, dropLng);
+
+      const etaData = await calculateETA({
+        origin: [pickupLng, pickupLat],
+        destination: [dropLng, dropLat],
+        vehicleType,
+        distanceKm: distance
+      }, { useGoogleMaps: false });
+
+      const activeRides = await Ride.find({
+        rider: riderId,
+        status: { $in: ["requested", "accepted", "arrived", "ongoing", "reachedDestination"] }
+      });
+
+      const scheduledRides = await Ride.find({
+        rider: riderId,
+        isScheduled: true,
+        status: { $in: ["scheduled", "scheduled_ready", "requested", "accepted", "arrived", "ongoing", "reachedDestination"] }
+      });
+
+      const allRides = [...activeRides, ...scheduledRides];
+      const bufferMinutes = 15;
+
+      for (const existingRide of allRides) {
+        let existingStartTime, existingEndTime;
+
+        if (existingRide.isScheduled) {
+          existingStartTime = existingRide.scheduledFor;
+          existingEndTime = new Date(existingStartTime.getTime() + (existingRide.estimatedTime || 0) * 60 * 1000);
+        } else {
+          existingStartTime = existingRide.createdAt;
+          existingEndTime = new Date(existingStartTime.getTime() + (existingRide.estimatedTime || 0) * 60 * 1000);
+        }
+
+        const newStartTime = scheduledTime;
+        const newEndTime = new Date(scheduledTime.getTime() + etaData.estimatedTime * 60 * 1000);
+
+        const timeDiff1 = Math.abs(newStartTime - existingEndTime) / (1000 * 60);
+        const timeDiff2 = Math.abs(newEndTime - existingStartTime) / (1000 * 60);
+
+        if (timeDiff1 < bufferMinutes || timeDiff2 < bufferMinutes) {
+          return res.json(responseData("RIDE_TIME_CONFLICT", {}, req, false));
+        }
+      }
+
+      const ride = await Ride.create({
+        rider: riderId,
+        pickupLocation,
+        dropLocation,
+        distance: Number(distance.toFixed(2)),
+        finalFare: fare || 0,
+        vehicleType,
+        paymentMethod: paymentMethod || "cash",
+        status: "scheduled",
+        isScheduled: true,
+        scheduledFor: scheduledTime,
+        scheduledAt: now,
+        reminderSent: false,
+        autoCancelled: false,
+        promoCode: promoCode || null,
+        estimatedTime: etaData.estimatedTime
+      });
+
+      return res.json(responseData("RIDE_SCHEDULED", { ride }, req, true));
+    } catch (err) {
+      console.error("scheduleRide error:", err);
+      return res.json(responseData(err.message || "SERVER_ERROR", {}, req, false));
+    }
+  },
+
+  rescheduleRide: async (req, res) => {
+    try {
+      const { rideId } = req.params;
+      const { scheduledFor } = req.body;
+      const riderId = req.user?._id;
+
+      if (!riderId) {
+        return res.json(responseData("NOT_AUTHORIZED", {}, req, false));
+      }
+
+      const ride = await Ride.findOne({ _id: rideId, rider: riderId, isScheduled: true });
+      if (!ride) {
+        return res.json(responseData("RIDE_NOT_FOUND", {}, req, false));
+      }
+
+      if (ride.status !== "scheduled") {
+        return res.json(responseData("CANNOT_RESCHEDULE_ACTIVE_RIDE", {}, req, false));
+      }
+
+      let scheduledTime;
+      if (typeof scheduledFor === 'string' && scheduledFor.includes('/')) {
+        const dateTimeRegex = /^(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2})$/;
+        const match = scheduledFor.trim().match(dateTimeRegex);
+        if (!match) {
+          return res.json(responseData("INVALID_DATE_FORMAT", {}, req, false));
+        }
+        const [, day, month, year, hour, minute] = match;
+        scheduledTime = new Date(`${year}-${month}-${day}T${hour}:${minute}:00`);
+        if (isNaN(scheduledTime.getTime())) {
+          return res.json(responseData("INVALID_DATE_FORMAT", {}, req, false));
+        }
+      } else {
+        scheduledTime = new Date(scheduledFor);
+        if (isNaN(scheduledTime.getTime())) {
+          return res.json(responseData("INVALID_DATE_FORMAT", {}, req, false));
+        }
+      }
+
+      const now = new Date();
+      const minTime = new Date(now.getTime() + 15 * 60 * 1000);
+      const maxTime = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+
+      if (scheduledTime <= now || scheduledTime < minTime || scheduledTime > maxTime) {
+        return res.json(responseData("INVALID_SCHEDULED_TIME", {}, req, false));
+      }
+
+      const scheduledRides = await Ride.find({
+        rider: riderId,
+        _id: { $ne: rideId },
+        isScheduled: true,
+        status: { $in: ["scheduled", "scheduled_ready", "requested", "accepted", "arrived", "ongoing", "reachedDestination"] }
+      });
+
+      const bufferMinutes = 15;
+      for (const existingRide of scheduledRides) {
+        const existingStartTime = existingRide.scheduledFor;
+        const existingEndTime = new Date(existingStartTime.getTime() + (existingRide.estimatedTime || 0) * 60 * 1000);
+        const newStartTime = scheduledTime;
+        const newEndTime = new Date(scheduledTime.getTime() + ride.estimatedTime * 60 * 1000);
+
+        const timeDiff1 = Math.abs(newStartTime - existingEndTime) / (1000 * 60);
+        const timeDiff2 = Math.abs(newEndTime - existingStartTime) / (1000 * 60);
+
+        if (timeDiff1 < bufferMinutes || timeDiff2 < bufferMinutes) {
+          return res.json(responseData("RIDE_TIME_CONFLICT", {}, req, false));
+        }
+      }
+
+      ride.scheduledFor = scheduledTime;
+      ride.reminderSent = false;
+      await ride.save();
+
+      return res.json(responseData("RIDE_RESCHEDULED", { ride }, req, true));
+    } catch (err) {
+      console.error("rescheduleRide error:", err);
+      return res.json(responseData(err.message || "SERVER_ERROR", {}, req, false));
+    }
   },
 
   cancelRide: async (req, res) => {
@@ -391,16 +521,12 @@ applyPromo: async (req, res) => {
     const ride = await Ride.findOne({ _id: rideId, rider: riderId });
     if (!ride) return res.json(responseData("INVALID_RIDE", {}, req, false));
 
-    if (ride.status === "completed") {
-      return res.json(responseData("RIDE_ALREADY_COMPLETED", {}, req, false));
+    if (ride.status === "completed" || ride.status === "cancelled") {
+      return res.json(responseData("RIDE_CANNOT_BE_CANCELLED", {}, req, false));
     }
 
-    if (ride.status === "cancelled") {
-      return res.json(responseData("RIDE_ALREADY_CANCELLED", {}, req, false));
-    }
-
-    if (ride.status === "reachedDestination") {
-      return res.json(responseData("CANNOT_CANCEL_RIDE_AT_DESTINATION", {}, req, false));
+    if (ride.status === "ongoing" || ride.status === "reachedDestination") {
+      return res.json(responseData("CANNOT_CANCEL_RIDE_IN_PROGRESS", {}, req, false));
     }
 
     ride.status = "cancelled";
@@ -409,7 +535,6 @@ applyPromo: async (req, res) => {
     ride.cancelledAt = new Date();
     await ride.save();
 
-    // Set driver as available when ride is cancelled by user
     if (ride.driver) {
       await Driver.findByIdAndUpdate(ride.driver, { isAvailable: true });
       sendRideToDriver(ride.driver.toString(), { 
