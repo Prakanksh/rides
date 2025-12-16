@@ -31,6 +31,7 @@ db.initialize();
 const crons = require('./helpers/cron');
 crons.cashSettlement();
 crons.walletSettlement();
+crons.scheduledRidesActivation();
 
 const corsOption = {
   methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
