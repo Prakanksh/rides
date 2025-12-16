@@ -1,6 +1,7 @@
 const Ride = require("../../models/ride.model");
 const Driver = require("../../models/driver.model");
 const Vehicle = require("../../models/vehicle.model");
+const User = require("../../models/user.model");
 const { sendRideToDriver, sendToUser } = require("../../socket/emitRide");
 
 async function activateScheduledRides() {
@@ -13,7 +14,7 @@ async function activateScheduledRides() {
       status: "scheduled",
       scheduledFor: { $lte: activationTime },
       autoCancelled: false
-    }).populate("rider", "_id status");
+    }).populate({ path: "rider", model: "users", select: "_id status" });
 
     for (const ride of ridesToActivate) {
       if (!ride.rider || (ride.rider.status && ride.rider.status !== "active")) {

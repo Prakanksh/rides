@@ -336,7 +336,8 @@ module.exports = {
           return res.json(responseData("INVALID_DATE_FORMAT", {}, req, false));
         }
         const [, day, month, year, hour, minute] = match;
-        scheduledTime = new Date(`${year}-${month}-${day}T${hour}:${minute}:00`);
+        const dateString = `${year}-${month}-${day}T${hour}:${minute}:00+05:30`;
+        scheduledTime = new Date(dateString);
         if (isNaN(scheduledTime.getTime())) {
           return res.json(responseData("INVALID_DATE_FORMAT", {}, req, false));
         }
@@ -462,7 +463,8 @@ module.exports = {
           return res.json(responseData("INVALID_DATE_FORMAT", {}, req, false));
         }
         const [, day, month, year, hour, minute] = match;
-        scheduledTime = new Date(`${year}-${month}-${day}T${hour}:${minute}:00`);
+        const dateString = `${year}-${month}-${day}T${hour}:${minute}:00+05:30`;
+        scheduledTime = new Date(dateString);
         if (isNaN(scheduledTime.getTime())) {
           return res.json(responseData("INVALID_DATE_FORMAT", {}, req, false));
         }
