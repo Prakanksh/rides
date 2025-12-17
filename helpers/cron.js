@@ -3,6 +3,7 @@ const { awsUrl } = require("../services/cron/cron");
 const processCashSettlements = require("../services/cron/cashSettlement.cron");
 const processWalletSettlements = require("../services/cron/walletSettlement.cron");
 const { activateScheduledRides } = require("../services/cron/scheduledRides.cron");
+const { autoCancelRides } = require("../services/cron/autoCancelRides.cron");
 const { cashSettlementSchedule, walletSettlementSchedule } = require("../configs/cron.config");
 
 let crons = {
@@ -29,6 +30,13 @@ let crons = {
         console.log("📅 Scheduled rides activation cron: Every 1 minute");
         let job = cron.schedule("* * * * *", async () => {
             await activateScheduledRides();
+        });
+        job.start();
+    },
+    autoCancelRides: async () => {
+        console.log("🚫 Auto-cancel rides cron: Every 2 minutes");
+        let job = cron.schedule("*/2 * * * *", async () => {
+            await autoCancelRides();
         });
         job.start();
     },

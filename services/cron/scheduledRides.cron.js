@@ -39,7 +39,6 @@ async function activateScheduledRides() {
       }
 
       ride.status = "scheduled_ready";
-      ride.scheduledReadyAt = new Date();
       await ride.save();
 
       const normalizedVehicleType = ride.vehicleType === "prime sedan" ? "prime-sedan" : ride.vehicleType;
