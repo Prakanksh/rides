@@ -4,7 +4,8 @@ const Vehicle = require("../../models/vehicle.model");
 const { responseData } = require("../../helpers/responseData");
 const { calculateDistanceInKm } = require("../../helpers/distance");
 const { calculateFare, calculateAllVehicleFares } = require("../../helpers/fareConfig");
-const { sendRideToDriver, sendToUser } = require("../../socket/emitRide");
+const { sendRideToDriver, sendToUser, _getIo } = require("../../socket/emitRide");
+const { getDriverSocketId } = require("../../socket/driverSocketMap");
 const { calculateETA } = require("../../helpers/etaCalculator");
 const promoCodeModel = require("../../models/promoCode.model");
 
@@ -539,12 +540,22 @@ module.exports = {
 
     if (ride.driver) {
       await Driver.findByIdAndUpdate(ride.driver, { isAvailable: true });
-      sendRideToDriver(ride.driver.toString(), { 
-        event: "rideCancelled", 
-        ride, 
-        cancelledBy: "user" 
-      });
+      const ioInstance = _getIo();
+      if (ioInstance) {
+        const driverSocket = getDriverSocketId(ride.driver.toString());
+        if (driverSocket) {
+          ioInstance.to(driverSocket).emit("driver:rideCancelled", { ride, cancelledBy: "user" });
+        } else {
+          ioInstance.to(`driver:${ride.driver}`).emit("driver:rideCancelled", { ride, cancelledBy: "user" });
+        }
+      }
     }
+
+    sendToUser(riderId.toString(), "user:rideCancelled", {
+      ride,
+      cancelledBy: "user",
+      message: reason || "Ride cancelled by user"
+    });
 
     return res.json(responseData("RIDE_CANCELLED", { ride }, req, true));
   }

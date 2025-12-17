@@ -140,9 +140,9 @@ async function activateScheduledRides() {
           await sendNotificationAndroidIosUser(user, "Scheduled Ride Activated", "Your scheduled ride is now active. Driver matching has started.");
         }
 
-        sendToUser(riderId.toString(), {
-          event: "scheduledRideActivated",
-          ride
+        sendToUser(riderId.toString(), "user:scheduledRideActivated", {
+          ride: ride,
+          message: "Your scheduled ride is now active. Driver matching has started."
         });
       }
     }

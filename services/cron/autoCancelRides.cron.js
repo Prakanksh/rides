@@ -127,15 +127,14 @@ async function autoCancelRides() {
             await sendNotificationAndroidIosUser(user, "Ride Cancelled", message);
           }
 
-          sendToUser(riderId, {
-            event: "rideAutoCancelled",
-            ride: {
-              _id: ride._id,
-              isScheduled: ride.isScheduled || false,
-              cancellationReason
-            },
-            message
-          });
+          const cancelledRide = await Ride.findById(ride._id);
+          if (cancelledRide) {
+            sendToUser(riderId.toString(), "user:rideCancelled", {
+              ride: cancelledRide,
+              cancelledBy: "system",
+              message
+            });
+          }
         }
       }
     }
