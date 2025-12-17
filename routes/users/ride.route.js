@@ -23,7 +23,7 @@ router.get("/active", verifyToken, rideController.getActiveRide);
 router.post("/cancel", verifyToken, rideController.cancelRide);
 
 // Schedule a ride
-router.post("/schedule", verifyToken, rideController.scheduleRide);
+router.post("/schedule/:rideId", verifyToken, rideController.scheduleRide);
 
 // Reschedule a ride
 router.put("/reschedule/:rideId", verifyToken, rideController.rescheduleRide);

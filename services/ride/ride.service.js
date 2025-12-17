@@ -310,14 +310,20 @@ module.exports = {
 
   scheduleRide: async (req, res) => {
     try {
-      const { pickupLocation, dropLocation, vehicleType, paymentMethod, scheduledFor, distanceKm, fare, promoCode } = req.body;
+      const { rideId } = req.params;
+      const { vehicleType, paymentMethod, scheduledFor, distanceKm, fare, promoCode } = req.body;
       const riderId = req.user?._id;
 
       if (!riderId) {
         return res.json(responseData("NOT_AUTHORIZED", {}, req, false));
       }
 
-      if (!pickupLocation?.coordinates || !dropLocation?.coordinates) {
+      const existingRide = await Ride.findOne({ _id: rideId, rider: riderId });
+      if (!existingRide) {
+        return res.json(responseData("RIDE_NOT_FOUND", {}, req, false));
+      }
+
+      if (!existingRide.pickupLocation?.coordinates || !existingRide.dropLocation?.coordinates) {
         return res.json(responseData("LOCATIONS_REQUIRED", {}, req, false));
       }
 
@@ -365,9 +371,9 @@ module.exports = {
         return res.json(responseData("SCHEDULED_TIME_TOO_FAR", {}, req, false));
       }
 
-      const [pickupLng, pickupLat] = pickupLocation.coordinates;
-      const [dropLng, dropLat] = dropLocation.coordinates;
-      const distance = distanceKm || calculateDistanceInKm(pickupLat, pickupLng, dropLat, dropLng);
+      const [pickupLng, pickupLat] = existingRide.pickupLocation.coordinates;
+      const [dropLng, dropLat] = existingRide.dropLocation.coordinates;
+      const distance = distanceKm || existingRide.distance || calculateDistanceInKm(pickupLat, pickupLng, dropLat, dropLng);
 
       const etaData = await calculateETA({
         origin: [pickupLng, pickupLat],
@@ -412,23 +418,28 @@ module.exports = {
         }
       }
 
-      const ride = await Ride.create({
-        rider: riderId,
-        pickupLocation,
-        dropLocation,
-        distance: Number(distance.toFixed(2)),
-        finalFare: fare || 0,
-        vehicleType,
-        paymentMethod: paymentMethod || "cash",
-        status: "scheduled",
-        isScheduled: true,
-        scheduledFor: scheduledTime,
-        scheduledAt: now,
-        reminderSent: false,
-        autoCancelled: false,
-        promoCode: promoCode || null,
-        estimatedTime: etaData.estimatedTime
-      });
+      const ride = await Ride.findByIdAndUpdate(
+        rideId,
+        {
+          distance: Number(distance.toFixed(2)),
+          finalFare: fare || 0,
+          vehicleType,
+          paymentMethod: paymentMethod || "cash",
+          status: "scheduled",
+          isScheduled: true,
+          scheduledFor: scheduledTime,
+          scheduledAt: now,
+          reminderSent: false,
+          autoCancelled: false,
+          promoCode: promoCode || existingRide.promoCode || null,
+          estimatedTime: etaData.estimatedTime
+        },
+        { new: true }
+      );
+
+      if (!ride) {
+        return res.json(responseData("RIDE_UPDATE_FAILED", {}, req, false));
+      }
 
       return res.json(responseData("RIDE_SCHEDULED", { ride }, req, true));
     } catch (err) {
