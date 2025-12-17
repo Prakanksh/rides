@@ -364,6 +364,13 @@ function initSocketIO(io) {
           }
         }
 
+        const riderSocket = getUserSocketId(ride.rider);
+        if (riderSocket && ioInstance) {
+          ioInstance.to(riderSocket).emit("user:rideCancelled", { ride, cancelledBy: "user", message: reason || "Ride cancelled by user" });
+        } else if (ioInstance) {
+          ioInstance.to(`user:${ride.rider}`).emit("user:rideCancelled", { ride, cancelledBy: "user", message: reason || "Ride cancelled by user" });
+        }
+
         socket.emit("ride:cancel:response", { success: true, ride });
       } catch (e) { 
         console.error("ride:cancel:user err", e); 

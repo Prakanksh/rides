@@ -32,6 +32,9 @@ const crons = require('./helpers/cron');
 crons.cashSettlement();
 crons.walletSettlement();
 crons.estimateRidesDelete()
+crons.scheduledRidesActivation();
+crons.autoCancelRides();
+
 const corsOption = {
   methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
   exposedHeaders: ['x-access-token']

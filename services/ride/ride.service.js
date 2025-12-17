@@ -4,7 +4,8 @@ const Vehicle = require("../../models/vehicle.model");
 const { responseData } = require("../../helpers/responseData");
 const { calculateDistanceInKm } = require("../../helpers/distance");
 const { calculateFare, calculateAllVehicleFares } = require("../../helpers/fareConfig");
-const { sendRideToDriver, sendToUser } = require("../../socket/emitRide");
+const { sendRideToDriver, sendToUser, _getIo } = require("../../socket/emitRide");
+const { getDriverSocketId } = require("../../socket/driverSocketMap");
 const { calculateETA } = require("../../helpers/etaCalculator");
 const promoCodeModel = require("../../models/promoCode.model");
 
@@ -309,14 +310,20 @@ module.exports = {
 
   scheduleRide: async (req, res) => {
     try {
-      const { pickupLocation, dropLocation, vehicleType, paymentMethod, scheduledFor, distanceKm, fare, promoCode } = req.body;
+      const { rideId } = req.params;
+      const { vehicleType, paymentMethod, scheduledFor, distanceKm, fare, promoCode } = req.body;
       const riderId = req.user?._id;
 
       if (!riderId) {
         return res.json(responseData("NOT_AUTHORIZED", {}, req, false));
       }
 
-      if (!pickupLocation?.coordinates || !dropLocation?.coordinates) {
+      const existingRide = await Ride.findOne({ _id: rideId, rider: riderId });
+      if (!existingRide) {
+        return res.json(responseData("RIDE_NOT_FOUND", {}, req, false));
+      }
+
+      if (!existingRide.pickupLocation?.coordinates || !existingRide.dropLocation?.coordinates) {
         return res.json(responseData("LOCATIONS_REQUIRED", {}, req, false));
       }
 
@@ -336,7 +343,8 @@ module.exports = {
           return res.json(responseData("INVALID_DATE_FORMAT", {}, req, false));
         }
         const [, day, month, year, hour, minute] = match;
-        scheduledTime = new Date(`${year}-${month}-${day}T${hour}:${minute}:00`);
+        const dateString = `${year}-${month}-${day}T${hour}:${minute}:00+05:30`;
+        scheduledTime = new Date(dateString);
         if (isNaN(scheduledTime.getTime())) {
           return res.json(responseData("INVALID_DATE_FORMAT", {}, req, false));
         }
@@ -363,9 +371,9 @@ module.exports = {
         return res.json(responseData("SCHEDULED_TIME_TOO_FAR", {}, req, false));
       }
 
-      const [pickupLng, pickupLat] = pickupLocation.coordinates;
-      const [dropLng, dropLat] = dropLocation.coordinates;
-      const distance = distanceKm || calculateDistanceInKm(pickupLat, pickupLng, dropLat, dropLng);
+      const [pickupLng, pickupLat] = existingRide.pickupLocation.coordinates;
+      const [dropLng, dropLat] = existingRide.dropLocation.coordinates;
+      const distance = distanceKm || existingRide.distance || calculateDistanceInKm(pickupLat, pickupLng, dropLat, dropLng);
 
       const etaData = await calculateETA({
         origin: [pickupLng, pickupLat],
@@ -410,23 +418,28 @@ module.exports = {
         }
       }
 
-      const ride = await Ride.create({
-        rider: riderId,
-        pickupLocation,
-        dropLocation,
-        distance: Number(distance.toFixed(2)),
-        finalFare: fare || 0,
-        vehicleType,
-        paymentMethod: paymentMethod || "cash",
-        status: "scheduled",
-        isScheduled: true,
-        scheduledFor: scheduledTime,
-        scheduledAt: now,
-        reminderSent: false,
-        autoCancelled: false,
-        promoCode: promoCode || null,
-        estimatedTime: etaData.estimatedTime
-      });
+      const ride = await Ride.findByIdAndUpdate(
+        rideId,
+        {
+          distance: Number(distance.toFixed(2)),
+          finalFare: fare || 0,
+          vehicleType,
+          paymentMethod: paymentMethod || "cash",
+          status: "scheduled",
+          isScheduled: true,
+          scheduledFor: scheduledTime,
+          scheduledAt: now,
+          reminderSent: false,
+          autoCancelled: false,
+          promoCode: promoCode || existingRide.promoCode || null,
+          estimatedTime: etaData.estimatedTime
+        },
+        { new: true }
+      );
+
+      if (!ride) {
+        return res.json(responseData("RIDE_UPDATE_FAILED", {}, req, false));
+      }
 
       return res.json(responseData("RIDE_SCHEDULED", { ride }, req, true));
     } catch (err) {
@@ -462,7 +475,8 @@ module.exports = {
           return res.json(responseData("INVALID_DATE_FORMAT", {}, req, false));
         }
         const [, day, month, year, hour, minute] = match;
-        scheduledTime = new Date(`${year}-${month}-${day}T${hour}:${minute}:00`);
+        const dateString = `${year}-${month}-${day}T${hour}:${minute}:00+05:30`;
+        scheduledTime = new Date(dateString);
         if (isNaN(scheduledTime.getTime())) {
           return res.json(responseData("INVALID_DATE_FORMAT", {}, req, false));
         }
@@ -537,12 +551,22 @@ module.exports = {
 
     if (ride.driver) {
       await Driver.findByIdAndUpdate(ride.driver, { isAvailable: true });
-      sendRideToDriver(ride.driver.toString(), { 
-        event: "rideCancelled", 
-        ride, 
-        cancelledBy: "user" 
-      });
+      const ioInstance = _getIo();
+      if (ioInstance) {
+        const driverSocket = getDriverSocketId(ride.driver.toString());
+        if (driverSocket) {
+          ioInstance.to(driverSocket).emit("driver:rideCancelled", { ride, cancelledBy: "user" });
+        } else {
+          ioInstance.to(`driver:${ride.driver}`).emit("driver:rideCancelled", { ride, cancelledBy: "user" });
+        }
+      }
     }
+
+    sendToUser(riderId.toString(), "user:rideCancelled", {
+      ride,
+      cancelledBy: "user",
+      message: reason || "Ride cancelled by user"
+    });
 
     return res.json(responseData("RIDE_CANCELLED", { ride }, req, true));
   }

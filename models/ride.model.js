@@ -91,7 +91,6 @@ const RideSchema = new mongoose.Schema(
     scheduledAt: { type: Date, default: null },
     reminderSent: { type: Boolean, default: false },
     autoCancelled: { type: Boolean, default: false },
-    scheduledReadyAt: { type: Date, default: null },
 
     cancellationReason: { type: String, default: "" },
     cancelledBy: {
@@ -184,6 +183,6 @@ RideSchema.index({ pickupLocation: "2dsphere" });
 RideSchema.index({ dropLocation: "2dsphere" });
 RideSchema.index({ isScheduled: 1, status: 1, scheduledFor: 1 });
 RideSchema.index({ isScheduled: 1, status: 1, reminderSent: 1, scheduledFor: 1 });
-RideSchema.index({ isScheduled: 1, status: 1, scheduledReadyAt: 1, autoCancelled: 1 });
+RideSchema.index({ isScheduled: 1, status: 1, driver: 1, cancelledBy: 1, autoCancelled: 1, updatedAt: 1 });
 
 module.exports = mongoose.model("Ride", RideSchema);

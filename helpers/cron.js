@@ -6,6 +6,10 @@ const { cashSettlementSchedule, walletSettlementSchedule,estimateRidesDeleteSche
 const { estimateRide } = require("../services/ride/ride.service");
 const moment = require("moment");
 const rideModel = require("../models/ride.model");
+const { activateScheduledRides } = require("../services/cron/scheduledRides.cron");
+const { autoCancelRides } = require("../services/cron/autoCancelRides.cron");
+// const { cashSettlementSchedule, walletSettlementSchedule } = require("../configs/cron.config");
+
 let crons = {
     deleteAwsUrl: async () => {
         console.log("CRON is running...")
@@ -46,5 +50,20 @@ let crons = {
   }
 })
 job.start();
-}}
+},
+    scheduledRidesActivation: async () => {
+        console.log("📅 Scheduled rides activation cron: Every 1 minute");
+        let job = cron.schedule("* * * * *", async () => {
+            await activateScheduledRides();
+        });
+        job.start();
+    },
+    autoCancelRides: async () => {
+        console.log("🚫 Auto-cancel rides cron: Every 2 minutes");
+        let job = cron.schedule("*/2 * * * *", async () => {
+            await autoCancelRides();
+        });
+        job.start();
+    },
+};
 module.exports = crons;
