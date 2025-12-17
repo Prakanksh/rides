@@ -1,7 +1,58 @@
 const Ride = require("../../models/ride.model");
+const User = require("../../models/user.model");
+const Notification = require("../../models/notification.model");
+const sendNotification = require("../../helpers/firebase-admin");
 const { sendToUser } = require("../../socket/emitRide");
+const _ = require("lodash");
 
 const AUTO_CANCEL_TIMEOUT_MINUTES = 15;
+
+async function sendNotificationAndroidIosUser(receiverUser, title, description) {
+  await Notification.create({
+    userId: receiverUser?._id,
+    userType: "user",
+    title,
+    description
+  });
+  // Firebase push notifications commented out for now
+  // if (receiverUser?.deviceType === "android" && receiverUser?.notifications) {
+  //   if (!_.isEmpty(receiverUser?.deviceToken)) {
+  //     const messages = [
+  //       {
+  //         data: {
+  //           title: title,
+  //           body: description
+  //         },
+  //         token: receiverUser?.deviceToken,
+  //         android: { ttl: 10, priority: "high" }
+  //       }
+  //     ];
+  //     await sendNotification.sendNotifications(messages);
+  //   }
+  // }
+  // if (receiverUser?.deviceType === "ios" && receiverUser?.notifications) {
+  //   if (!_.isEmpty(receiverUser?.deviceToken)) {
+  //     const messages = [
+  //       {
+  //         notification: {
+  //           title: title,
+  //           body: description
+  //         },
+  //         apns: {
+  //           payload: {
+  //             aps: {
+  //               sound: "default"
+  //             }
+  //           }
+  //         },
+  //         token: receiverUser?.deviceToken,
+  //         android: { ttl: 10, priority: "high" }
+  //       }
+  //     ];
+  //     await sendNotification.sendNotifications(messages);
+  //   }
+  // }
+}
 
 async function autoCancelRides() {
   try {
@@ -67,6 +118,15 @@ async function autoCancelRides() {
       for (const ride of cancelledRides) {
         const riderId = ride.rider?.toString() || ride.rider;
         if (riderId) {
+          const user = await User.findById(riderId).select("_id firstName lastName email deviceType deviceToken notifications");
+          const message = ride.isScheduled
+            ? "Sorry, no driver was available for your scheduled ride. It has been cancelled."
+            : "Sorry, no driver was available for your ride. It has been cancelled.";
+          
+          if (user) {
+            await sendNotificationAndroidIosUser(user, "Ride Cancelled", message);
+          }
+
           sendToUser(riderId, {
             event: "rideAutoCancelled",
             ride: {
@@ -74,9 +134,7 @@ async function autoCancelRides() {
               isScheduled: ride.isScheduled || false,
               cancellationReason
             },
-            message: ride.isScheduled
-              ? "Sorry, no driver was available for your scheduled ride. It has been cancelled."
-              : "Sorry, no driver was available for your ride. It has been cancelled."
+            message
           });
         }
       }

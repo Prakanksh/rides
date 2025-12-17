@@ -2,7 +2,57 @@ const Ride = require("../../models/ride.model");
 const Driver = require("../../models/driver.model");
 const Vehicle = require("../../models/vehicle.model");
 const User = require("../../models/user.model");
+const Notification = require("../../models/notification.model");
+const sendNotification = require("../../helpers/firebase-admin");
 const { sendRideToDriver, sendToUser } = require("../../socket/emitRide");
+const _ = require("lodash");
+
+async function sendNotificationAndroidIosUser(receiverUser, title, description) {
+  await Notification.create({
+    userId: receiverUser?._id,
+    userType: "user",
+    title,
+    description
+  });
+  // Firebase push notifications commented out for now
+  // if (receiverUser?.deviceType === "android" && receiverUser?.notifications) {
+  //   if (!_.isEmpty(receiverUser?.deviceToken)) {
+  //     const messages = [
+  //       {
+  //         data: {
+  //           title: title,
+  //           body: description
+  //         },
+  //         token: receiverUser?.deviceToken,
+  //         android: { ttl: 10, priority: "high" }
+  //       }
+  //     ];
+  //     await sendNotification.sendNotifications(messages);
+  //   }
+  // }
+  // if (receiverUser?.deviceType === "ios" && receiverUser?.notifications) {
+  //   if (!_.isEmpty(receiverUser?.deviceToken)) {
+  //     const messages = [
+  //       {
+  //         notification: {
+  //           title: title,
+  //           body: description
+  //         },
+  //         apns: {
+  //           payload: {
+  //             aps: {
+  //               sound: "default"
+  //             }
+  //           }
+  //         },
+  //         token: receiverUser?.deviceToken,
+  //         android: { ttl: 10, priority: "high" }
+  //       }
+  //     ];
+  //     await sendNotification.sendNotifications(messages);
+  //   }
+  // }
+}
 
 async function activateScheduledRides() {
   try {
@@ -24,6 +74,14 @@ async function activateScheduledRides() {
         ride.cancellationReason = "User account inactive";
         ride.autoCancelled = true;
         await ride.save();
+        
+        const riderId = ride.rider?._id || ride.rider;
+        if (riderId) {
+          const user = await User.findById(riderId).select("_id firstName lastName email deviceType deviceToken notifications");
+          if (user) {
+            await sendNotificationAndroidIosUser(user, "Scheduled Ride Cancelled", "Your scheduled ride has been cancelled because your account is inactive.");
+          }
+        }
         continue;
       }
 
@@ -76,6 +134,11 @@ async function activateScheduledRides() {
         nearbyDrivers.forEach(driver => {
           sendRideToDriver(driver._id.toString(), ride);
         });
+
+        const user = await User.findById(riderId).select("_id firstName lastName email deviceType deviceToken notifications");
+        if (user) {
+          await sendNotificationAndroidIosUser(user, "Scheduled Ride Activated", "Your scheduled ride is now active. Driver matching has started.");
+        }
 
         sendToUser(riderId.toString(), {
           event: "scheduledRideActivated",
