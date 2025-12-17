@@ -180,9 +180,10 @@ RideSchema.methods.getEstimatedCompletionTime = function() {
 };
 
 RideSchema.index({ pickupLocation: "2dsphere" });
-RideSchema.index({ dropLocation: "2dsphere" });
+RideSchema.index({ rider: 1, status: 1 });
+RideSchema.index({ driver: 1, status: 1 });
 RideSchema.index({ isScheduled: 1, status: 1, scheduledFor: 1 });
-RideSchema.index({ isScheduled: 1, status: 1, reminderSent: 1, scheduledFor: 1 });
-RideSchema.index({ isScheduled: 1, status: 1, driver: 1, cancelledBy: 1, autoCancelled: 1, updatedAt: 1 });
+RideSchema.index({ isScheduled: 1, status: 1, updatedAt: 1 });
+RideSchema.index({ status: 1, vehicleType: 1 });
 
 module.exports = mongoose.model("Ride", RideSchema);
