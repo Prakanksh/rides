@@ -31,7 +31,7 @@ db.initialize();
 const crons = require('./helpers/cron');
 crons.cashSettlement();
 crons.walletSettlement();
-
+crons.estimateRidesDelete()
 const corsOption = {
   methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
   exposedHeaders: ['x-access-token']

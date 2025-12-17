@@ -300,4 +300,5 @@ return res.json(responseData("PLAN_UPDATED",updated, req, true));
     return res.status(500).json(responseData("ERROR_OCCURED", err.message, req, false));
   }
 }
+
 }
