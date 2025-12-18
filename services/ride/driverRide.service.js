@@ -181,6 +181,7 @@ module.exports = {
 
       if (ride.paymentMethod === "cash") {
         ride.cashPaidByUser = false;
+        await ride.save();
         const updatedRide = await Ride.findById(ride._id);
         sendToUser(ride.rider.toString(), "user:reachedDestination", { ride: updatedRide });
         return res.json(responseData("REACHED_DESTINATION", { ride: updatedRide }, req, true));
