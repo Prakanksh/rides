@@ -7,6 +7,7 @@ const AdminSetting = require('../../models/adminSetting.model');
 const Notification = require('../../models/notification.model');
 const sendNotification = require('../../helpers/firebase-admin');
 const { sendEmail } = require('../../helpers/helper');
+const { resolveRideFare } = require('../../helpers/walletUtil');
 const _ = require('lodash');
 
 /**
@@ -160,7 +161,7 @@ async function processWalletSettlements() {
       paymentMethod: "wallet",
       status: "completed",
       paymentSuccessful: false
-    }).select("_id driver finalFare estimatedFare paidToAdmin paidToDriver paymentDetails");
+    }).select("_id driver finalFare estimatedFare originalFare discountAmount paidToAdmin paidToDriver paymentDetails");
 
     if (unsettledWalletRides.length === 0) {
       console.log("ℹ️  No unsettled wallet rides found.");
@@ -223,7 +224,7 @@ async function processWalletSettlements() {
         const rideIds = [];
 
         for (const ride of rides) {
-          const fare = ride.finalFare || ride.estimatedFare || 0;
+          const fare = resolveRideFare(ride, 0);
           if (fare > 0) {
             totalFare += fare;
             const adminShare = Number(((fare * adminPercent) / 100).toFixed(2));

@@ -8,6 +8,8 @@ const { sendRideToDriver, sendToUser, _getIo } = require("../../socket/emitRide"
 const { getDriverSocketId } = require("../../socket/driverSocketMap");
 const { calculateETA } = require("../../helpers/etaCalculator");
 const promoCodeModel = require("../../models/promoCode.model");
+const { calculateDiscount } = require("../../helpers/promoUtil");
+const { resolveRideFare } = require("../../helpers/walletUtil");
 
 module.exports = {
   // New flow: User selects vehicle and creates ride (updates existing ride from estimate)
@@ -24,6 +26,19 @@ module.exports = {
       const existingRide = await Ride.findOne({ _id: rideId, rider: riderId });
       if (!existingRide) {
         return res.json(responseData("RIDE_NOT_FOUND", {}, req, false));
+      }
+
+      // Only allow "create" on fresh estimate rides.
+      // Prevents updating already active/completed/cancelled rides by mistake.
+      if (existingRide.status !== "estimating") {
+        return res.json(
+          responseData(
+            "INVALID_RIDE_STATE",
+            { currentStatus: existingRide.status },
+            req,
+            false
+          )
+        );
       }
 
       if (!pickupLocation?.coordinates || !dropLocation?.coordinates) {
@@ -67,6 +82,19 @@ module.exports = {
         }
       }
 
+      // Calculate promo discount if promo code is provided
+      const originalFare = fare || 0;
+      let discountAmount = 0;
+      let finalFare = originalFare;
+      
+      if (promoCode && originalFare > 0) {
+        const discountResult = await calculateDiscount(promoCode, originalFare);
+        if (discountResult.isValid) {
+          discountAmount = discountResult.discountAmount;
+          finalFare = Math.max(0, Number((originalFare - discountAmount).toFixed(2)));
+        }
+      }
+
       // Update ride with vehicle selection and other details
       const ride = await Ride.findByIdAndUpdate(
         rideId,
@@ -74,7 +102,9 @@ module.exports = {
           pickupLocation,
           dropLocation,
           distance: Number((distanceKm || existingRide.distance).toFixed(2)),
-          finalFare: fare || 0,
+          finalFare: finalFare,
+          originalFare: originalFare,
+          discountAmount: discountAmount,
           vehicleType,
           paymentMethod: paymentMethod || "cash",
           status: "requested",
@@ -296,6 +326,39 @@ module.exports = {
     return res.json(responseData("ACTIVE_RIDE", { ride }, req, true));
   },
 
+  paymentDue: async (req, res) => {
+    const riderId = req.user?._id;
+    const { rideId } = req.query || {};
+    if (!riderId) return res.json(responseData("NOT_AUTHORIZED", {}, req, false));
+    if (!rideId) return res.json(responseData("RIDE_ID_REQUIRED", {}, req, false));
+
+    const ride = await Ride.findOne({ _id: rideId, rider: riderId });
+    if (!ride) return res.json(responseData("INVALID_RIDE", {}, req, false));
+    if (ride.paymentMethod !== "cash" || ride.status !== "reachedDestination") {
+      return res.json(responseData("INVALID_RIDE_STATE", {}, req, false));
+    }
+
+    const amountToPay = Number(resolveRideFare(ride, 0).toFixed(2));
+    return res.json(responseData("PAYMENT_DUE", { rideId: ride._id, amountToPay, currency: "INR" }, req, true));
+  },
+
+  paidPayment: async (req, res) => {
+    const riderId = req.user?._id;
+    const { rideId } = req.body || {};
+    if (!riderId) return res.json(responseData("NOT_AUTHORIZED", {}, req, false));
+    if (!rideId) return res.json(responseData("RIDE_ID_REQUIRED", {}, req, false));
+
+    const ride = await Ride.findOne({ _id: rideId, rider: riderId });
+    if (!ride) return res.json(responseData("INVALID_RIDE", {}, req, false));
+    if (ride.paymentMethod !== "cash" || ride.status !== "reachedDestination") {
+      return res.json(responseData("INVALID_RIDE_STATE", {}, req, false));
+    }
+
+    ride.cashPaidByUser = true;
+    await ride.save();
+    return res.json(responseData("PAYMENT_MARKED", { rideId: ride._id }, req, true));
+  },
+
   getScheduledRides: async (req, res) => {
     const userId = req.user._id;
 
@@ -418,11 +481,27 @@ module.exports = {
         }
       }
 
+      // Calculate promo discount if promo code is provided
+      const originalFare = fare || 0;
+      let discountAmount = 0;
+      let finalFare = originalFare;
+      
+      const promoCodeToUse = promoCode || existingRide.promoCode;
+      if (promoCodeToUse && originalFare > 0) {
+        const discountResult = await calculateDiscount(promoCodeToUse, originalFare);
+        if (discountResult.isValid) {
+          discountAmount = discountResult.discountAmount;
+          finalFare = Math.max(0, Number((originalFare - discountAmount).toFixed(2)));
+        }
+      }
+
       const ride = await Ride.findByIdAndUpdate(
         rideId,
         {
           distance: Number(distance.toFixed(2)),
-          finalFare: fare || 0,
+          finalFare: finalFare,
+          originalFare: originalFare,
+          discountAmount: discountAmount,
           vehicleType,
           paymentMethod: paymentMethod || "cash",
           status: "scheduled",
@@ -431,7 +510,7 @@ module.exports = {
           scheduledAt: now,
           reminderSent: false,
           autoCancelled: false,
-          promoCode: promoCode || existingRide.promoCode || null,
+          promoCode: promoCodeToUse || null,
           estimatedTime: etaData.estimatedTime
         },
         { new: true }

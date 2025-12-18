@@ -57,6 +57,8 @@ const RideSchema = new mongoose.Schema(
     // estimatedFare: { type: Number, default: 0 },
     estimatedFare:[vehicleFareSchema],
     finalFare: { type: Number, default: 0 },
+    originalFare: { type: Number, default: 0 },
+    discountAmount: { type: Number, default: 0 },
     paymentMethod: {
       type: String,
       enum: ["cash", "online", "wallet"],
@@ -126,6 +128,10 @@ const RideSchema = new mongoose.Schema(
       type: Boolean,
       default: false
     },
+    cashPaidByUser: {
+      type: Boolean,
+      default: false
+    },
     transactionId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "transactions",
@@ -143,7 +149,10 @@ const RideSchema = new mongoose.Schema(
       userPaidAmount: { type: Number, default: 0 },
       driverReceivedAmount: { type: Number, default: 0 },
       adminCommissionAmount: { type: Number, default: 0 },
-      paymentCompletedAt: { type: Date, default: null }
+      paymentCompletedAt: { type: Date, default: null },
+      discountAmount: { type: Number, default: 0 },
+      originalFare: { type: Number, default: 0 },
+      promoCode: { type: String, default: null }
     },  promoCode:{
 type: String,
   },
