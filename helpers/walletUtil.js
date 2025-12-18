@@ -107,10 +107,11 @@ async function payByWallet(ride, userId, driverId, finalFare) {
   await user.save();
 
   // For wallet rides: user payment goes to admin.commission now; nightly cron settles to driver/admin wallets.
-  // Shares are computed from the paid amount (finalFare).
-  const { adminCut, driverShare } = await computeShares(roundedFinalFare);
+  // Shares are computed from the original fare; promo discount reduces admin share only.
+  const { adminCut, driverShare } = await computeShares(roundedOriginalFare);
   const roundedAdminCut = Number(adminCut.toFixed(2));
   const roundedDriverShare = Number(driverShare.toFixed(2));
+  const finalAdminShare = Math.max(0, Number((roundedAdminCut - roundedDiscountAmount).toFixed(2)));
 
   const currentAdminCommission = Number((admin.commission || 0).toFixed(2));
   admin.commission = Number((currentAdminCommission + roundedFinalFare).toFixed(2));
@@ -144,8 +145,8 @@ async function payByWallet(ride, userId, driverId, finalFare) {
   ride.paymentDetails.userPaidAmount = roundedFinalFare;
   ride.paymentDetails.driverReceivedAmount = roundedDriverShare;
   ride.driverReceivedAmount = roundedDriverShare;
-  ride.paymentDetails.adminCommissionAmount = roundedAdminCut;
-  ride.adminCommissionAmount = roundedAdminCut;
+  ride.paymentDetails.adminCommissionAmount = finalAdminShare;
+  ride.adminCommissionAmount = finalAdminShare;
   ride.paymentDetails.discountAmount = roundedDiscountAmount;
   ride.paymentDetails.originalFare = roundedOriginalFare;
   ride.paymentDetails.promoCode = ride.promoCode || null;

@@ -217,39 +217,41 @@ async function processWalletSettlements() {
           continue;
         }
 
-        // Calculate total fare, admin share, and driver share for this driver's rides
-        let totalFare = 0;
+        // Calculate totals for this driver's rides
+        let totalPaid = 0;
         let totalAdminShare = 0;
         let totalDriverShare = 0;
         const rideIds = [];
 
         for (const ride of rides) {
-          const fare = resolveRideFare(ride, 0);
-          if (fare > 0) {
-            totalFare += fare;
-            const adminShare = Number(((fare * adminPercent) / 100).toFixed(2));
-            const driverShare = Number(((fare * driverPercent) / 100).toFixed(2));
+          const paid = resolveRideFare(ride, 0);
+          const originalFare = Number((ride.originalFare > 0 ? ride.originalFare : paid).toFixed(2));
+          const discountAmount = Number((ride.discountAmount || 0).toFixed(2));
+          if (paid > 0 && originalFare > 0) {
+            totalPaid += paid;
+            const adminShare = Math.max(0, Number(((originalFare * adminPercent) / 100 - discountAmount).toFixed(2)));
+            const driverShare = Number(((originalFare * driverPercent) / 100).toFixed(2));
             totalAdminShare += adminShare;
             totalDriverShare += driverShare;
             rideIds.push(ride._id);
           }
         }
 
-        if (totalFare <= 0 || rideIds.length === 0) {
+        if (totalPaid <= 0 || rideIds.length === 0) {
           console.warn(`⚠️  Driver ${driver.firstName} ${driver.lastName}: No valid rides to settle`);
           continue;
         }
 
-        const roundedTotalFare = Number(totalFare.toFixed(2));
+        const roundedTotalPaid = Number(totalPaid.toFixed(2));
         const roundedTotalAdminShare = Number(totalAdminShare.toFixed(2));
         const roundedTotalDriverShare = Number(totalDriverShare.toFixed(2));
 
         // Verify admin has enough commission balance
         const currentAdminCommission = Number((admin.commission || 0).toFixed(2));
-        if (currentAdminCommission < roundedTotalFare) {
-          console.warn(`⚠️  Insufficient admin commission balance. Required: ₹${roundedTotalFare.toFixed(2)}, Available: ₹${currentAdminCommission.toFixed(2)}`);
+        if (currentAdminCommission < roundedTotalPaid) {
+          console.warn(`⚠️  Insufficient admin commission balance. Required: ₹${roundedTotalPaid.toFixed(2)}, Available: ₹${currentAdminCommission.toFixed(2)}`);
           
-          await notifyAdminInsufficientBalance(roundedTotalFare, currentAdminCommission);
+          await notifyAdminInsufficientBalance(roundedTotalPaid, currentAdminCommission);
           
           continue; // Skip this driver
         }
@@ -261,7 +263,7 @@ async function processWalletSettlements() {
         }
 
         // Update admin: deduct total fare from commission, add admin share to wallet
-        const newAdminCommission = Number((currentAdminCommission - roundedTotalFare).toFixed(2));
+        const newAdminCommission = Number((currentAdminCommission - roundedTotalPaid).toFixed(2));
         const currentAdminWallet = Number((admin.wallet || 0).toFixed(2));
         const newAdminWallet = Number((currentAdminWallet + roundedTotalAdminShare).toFixed(2));
         
@@ -304,7 +306,7 @@ async function processWalletSettlements() {
           transactionType: "admin_commission",
           amount: roundedTotalDriverShare,
           commissionAmount: roundedTotalAdminShare,
-          totalAmount: roundedTotalFare,
+          totalAmount: roundedTotalPaid,
           status: "completed"
         });
 
@@ -362,18 +364,18 @@ async function processWalletSettlements() {
         totalSettledRides += validRideIds.length;
         totalAdminAmount += roundedTotalAdminShare;
         totalDriverAmount += roundedTotalDriverShare;
-        totalDeductedFromCommission += roundedTotalFare;
+        totalDeductedFromCommission += roundedTotalPaid;
 
         console.log(`✅ Driver ${driver.firstName} ${driver.lastName} (${driver._id}):`);
-        console.log(`   - Settled ${validRideIds.length} ride(s), Total fare: ₹${roundedTotalFare.toFixed(2)}`);
-        console.log(`   - Deducted ₹${roundedTotalFare.toFixed(2)} from admin.commission`);
+        console.log(`   - Settled ${validRideIds.length} ride(s), Total paid: ₹${roundedTotalPaid.toFixed(2)}`);
+        console.log(`   - Deducted ₹${roundedTotalPaid.toFixed(2)} from admin.commission`);
         console.log(`   - Admin share (${adminPercent}%): ₹${roundedTotalAdminShare.toFixed(2)} → admin.wallet`);
         console.log(`   - Driver share (${driverPercent}%): ₹${roundedTotalDriverShare.toFixed(2)} → driver.wallet`);
 
         await notifyDriverSettlementSuccess(
           driver,
           validRideIds.length,
-          roundedTotalFare,
+          roundedTotalPaid,
           roundedTotalDriverShare,
           roundedTotalAdminShare
         );
