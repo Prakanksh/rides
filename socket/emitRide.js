@@ -165,8 +165,18 @@ function initSocketIO(io) {
           return; 
         }
         
-        if (!["ongoing", "reachedDestination", "completed"].includes(ride.status)) {
-          socket.emit("ride:reachedDestination:response", { success: false, message: "RIDE_NOT_STARTED" });
+        if (ride.paymentMethod === "wallet") {
+          if (!["ongoing", "completed"].includes(ride.status)) {
+            socket.emit("ride:reachedDestination:response", { success: false, message: "INVALID_RIDE_STATE", currentStatus: ride.status });
+            return;
+          }
+        } else if (ride.paymentMethod === "cash") {
+          if (!["ongoing", "reachedDestination", "completed"].includes(ride.status)) {
+            socket.emit("ride:reachedDestination:response", { success: false, message: "INVALID_RIDE_STATE", currentStatus: ride.status });
+            return;
+          }
+        } else {
+          socket.emit("ride:reachedDestination:response", { success: false, message: "INVALID_PAYMENT_METHOD" });
           return;
         }
         if (ride.status === "completed") {
