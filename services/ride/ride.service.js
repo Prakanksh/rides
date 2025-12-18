@@ -52,11 +52,12 @@ module.exports = {
       const [pickupLng, pickupLat] = pickupLocation.coordinates;
       const [dropLng, dropLat] = dropLocation.coordinates;
       const distance = distanceKm || existingRide.distance;
+      const normalizedVehicleType = vehicleType === "prime sedan" ? "prime-sedan" : vehicleType;
 
       const etaData = await calculateETA({
         origin: [pickupLng, pickupLat],
         destination: [dropLng, dropLat],
-        vehicleType,
+        vehicleType: normalizedVehicleType,
         distanceKm: distance
       }, { useGoogleMaps: false });
 
@@ -106,7 +107,7 @@ module.exports = {
           finalFare: finalFare,
           originalFare: originalFare,
           discountAmount: discountAmount,
-          vehicleType,
+          vehicleType: normalizedVehicleType,
           paymentMethod: paymentMethod || "cash",
           status: "requested",
           promoCode: promoCode || null,
@@ -120,7 +121,6 @@ module.exports = {
       }
 
       // Find drivers with matching vehicle type
-      const normalizedVehicleType = vehicleType === "prime sedan" ? "prime-sedan" : vehicleType;
       const vehiclesWithMatchingType = await Vehicle.find({
         type: normalizedVehicleType,
         status: "active"
@@ -438,11 +438,12 @@ module.exports = {
       const [pickupLng, pickupLat] = existingRide.pickupLocation.coordinates;
       const [dropLng, dropLat] = existingRide.dropLocation.coordinates;
       const distance = distanceKm || existingRide.distance || calculateDistanceInKm(pickupLat, pickupLng, dropLat, dropLng);
+      const normalizedVehicleType = vehicleType === "prime sedan" ? "prime-sedan" : vehicleType;
 
       const etaData = await calculateETA({
         origin: [pickupLng, pickupLat],
         destination: [dropLng, dropLat],
-        vehicleType,
+        vehicleType: normalizedVehicleType,
         distanceKm: distance
       }, { useGoogleMaps: false });
 
@@ -504,7 +505,7 @@ module.exports = {
           finalFare: finalFare,
           originalFare: originalFare,
           discountAmount: discountAmount,
-          vehicleType,
+          vehicleType: normalizedVehicleType,
           paymentMethod: paymentMethod || "cash",
           status: "scheduled",
           isScheduled: true,

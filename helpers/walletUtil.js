@@ -7,7 +7,6 @@ const { calculateActualTime } = require("./etaCalculator");
 
 function normalizeVehicleTypeForEstimate(vehicleType) {
   if (!vehicleType) return null;
-  // Ride schema uses "prime sedan" while some code/clients use "prime-sedan"
   if (vehicleType === "prime sedan") return "prime-sedan";
   return vehicleType;
 }

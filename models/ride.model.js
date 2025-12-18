@@ -67,7 +67,7 @@ const RideSchema = new mongoose.Schema(
 
     vehicleType: {
       type: String,
-      enum: ["two-wheeler", "auto", "mini", "prime sedan", "suv"],
+      enum: ["two-wheeler", "auto", "mini", "prime-sedan", "suv"],
       // required: true
     },
 
@@ -175,6 +175,11 @@ RideSchema.methods.updatePaymentStatus = function() {
   this.paymentDetails.driverReceivedAmount = Number(this.paymentDetails.driverReceivedAmount.toFixed(2));
   this.paymentDetails.adminCommissionAmount = Number(this.paymentDetails.adminCommissionAmount.toFixed(2));
 };
+
+RideSchema.pre("validate", function(next) {
+  if (this.vehicleType === "prime sedan") this.vehicleType = "prime-sedan";
+  next();
+});
 
 RideSchema.methods.getEstimatedArrivalTime = function() {
   if (!this.createdAt) return null;

@@ -3,6 +3,7 @@ const VEHICLE_SPEED_MAPPINGS = {
   "auto": 2.5,
   "mini": 3,
   "prime sedan": 2.5,
+  "prime-sedan": 2.5,
   "suv": 3.5
 };
 

@@ -39,11 +39,10 @@ module.exports = {
       if (!vehicle) {
         return res.json(responseData("NO_ACTIVE_VEHICLE", {}, req, false));
       }
-      const normalizedVehicleType = vehicle.type === "prime-sedan" ? "prime sedan" : vehicle.type;
 
       const baseQuery = {
         status: { $in: ["requested", "scheduled_ready"] },
-        vehicleType: normalizedVehicleType,
+        vehicleType: vehicle.type,
         cancelledDrivers: { $ne: driverId }
       };
 
