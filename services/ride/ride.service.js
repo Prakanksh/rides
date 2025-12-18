@@ -102,6 +102,7 @@ module.exports = {
           pickupLocation,
           dropLocation,
           distance: Number((distanceKm || existingRide.distance).toFixed(2)),
+          estimatedFare: [],
           finalFare: finalFare,
           originalFare: originalFare,
           discountAmount: discountAmount,
@@ -499,6 +500,7 @@ module.exports = {
         rideId,
         {
           distance: Number(distance.toFixed(2)),
+          estimatedFare: [],
           finalFare: finalFare,
           originalFare: originalFare,
           discountAmount: discountAmount,
