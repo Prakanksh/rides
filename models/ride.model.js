@@ -57,6 +57,8 @@ const RideSchema = new mongoose.Schema(
     // estimatedFare: { type: Number, default: 0 },
     estimatedFare:[vehicleFareSchema],
     finalFare: { type: Number, default: 0 },
+    originalFare: { type: Number, default: 0 },
+    discountAmount: { type: Number, default: 0 },
     paymentMethod: {
       type: String,
       enum: ["cash", "online", "wallet"],
@@ -65,7 +67,7 @@ const RideSchema = new mongoose.Schema(
 
     vehicleType: {
       type: String,
-      enum: ["two-wheeler", "auto", "mini", "prime sedan", "suv"],
+      enum: ["two-wheeler", "auto", "mini", "prime-sedan", "suv"],
       // required: true
     },
 
@@ -126,6 +128,10 @@ const RideSchema = new mongoose.Schema(
       type: Boolean,
       default: false
     },
+    cashPaidByUser: {
+      type: Boolean,
+      default: false
+    },
     transactionId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "transactions",
@@ -143,7 +149,10 @@ const RideSchema = new mongoose.Schema(
       userPaidAmount: { type: Number, default: 0 },
       driverReceivedAmount: { type: Number, default: 0 },
       adminCommissionAmount: { type: Number, default: 0 },
-      paymentCompletedAt: { type: Date, default: null }
+      paymentCompletedAt: { type: Date, default: null },
+      discountAmount: { type: Number, default: 0 },
+      originalFare: { type: Number, default: 0 },
+      promoCode: { type: String, default: null }
     },  promoCode:{
 type: String,
   },
@@ -167,6 +176,11 @@ RideSchema.methods.updatePaymentStatus = function() {
   this.paymentDetails.adminCommissionAmount = Number(this.paymentDetails.adminCommissionAmount.toFixed(2));
 };
 
+RideSchema.pre("validate", function(next) {
+  if (this.vehicleType === "prime sedan") this.vehicleType = "prime-sedan";
+  next();
+});
+
 RideSchema.methods.getEstimatedArrivalTime = function() {
   if (!this.createdAt) return null;
   const { DRIVER_ARRIVAL_BUFFER_MINUTES } = require("../helpers/etaCalculator");
@@ -180,9 +194,10 @@ RideSchema.methods.getEstimatedCompletionTime = function() {
 };
 
 RideSchema.index({ pickupLocation: "2dsphere" });
-RideSchema.index({ dropLocation: "2dsphere" });
+RideSchema.index({ rider: 1, status: 1 });
+RideSchema.index({ driver: 1, status: 1 });
 RideSchema.index({ isScheduled: 1, status: 1, scheduledFor: 1 });
-RideSchema.index({ isScheduled: 1, status: 1, reminderSent: 1, scheduledFor: 1 });
-RideSchema.index({ isScheduled: 1, status: 1, driver: 1, cancelledBy: 1, autoCancelled: 1, updatedAt: 1 });
+RideSchema.index({ isScheduled: 1, status: 1, updatedAt: 1 });
+RideSchema.index({ status: 1, vehicleType: 1 });
 
 module.exports = mongoose.model("Ride", RideSchema);

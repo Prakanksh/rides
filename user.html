@@ -2,17 +2,55 @@
 <html>
 <head>
   <title>User Socket Test</title>
+  <style>
+    body { font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; padding: 16px; }
+    input { width: 420px; padding: 6px 8px; margin: 4px 0; }
+    button { margin: 4px 6px 4px 0; padding: 6px 10px; }
+    .row { margin: 8px 0; }
+    .muted { color: #666; font-size: 12px; }
+    pre { background: #0b1020; color: #d7e3ff; padding: 12px; border-radius: 8px; overflow: auto; height: 420px; }
+    .two { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .card { border: 1px solid #e7e7e7; border-radius: 10px; padding: 12px; }
+  </style>
 </head>
 <body>
 <h2>User Socket Test</h2>
 
-User ID: <input id="userId" value="USER_ID_HERE" />  
-<button onclick="connectUser()">Connect User</button>
-<br/><br/>
+<div class="two">
+  <div class="card">
+    <div class="row">
+      <div><b>Socket URL</b></div>
+      <input id="socketUrl" value="http://localhost:5678" />
+    </div>
 
-Ride ID: <input id="rideId" />
+    <div class="row">
+      <div><b>User ID</b></div>
+      <input id="userId" value="USER_ID_HERE" />
+      <button onclick="connectUser()">Connect</button>
+      <button onclick="disconnectUser()">Disconnect</button>
+    </div>
 
-<pre id="log"></pre>
+    <div class="row">
+      <div><b>Ride ID</b></div>
+      <input id="rideId" placeholder="Paste active ride id" />
+      <div class="muted">This UI doesn’t create rides; create via API, then paste rideId here to test cash payment notifications.</div>
+    </div>
+
+    <div class="row">
+      <button onclick="emitPaidPayment()">user:paidPayment (cash only)</button>
+      <button onclick="clearLog()">Clear log</button>
+    </div>
+
+    <div class="muted">
+      You should receive: <code>user:rideAccepted</code>, <code>user:driverArrived</code>, <code>user:rideStarted</code>, live <code>driver:location</code>, and <code>user:rideCompleted</code>.
+    </div>
+  </div>
+
+  <div class="card">
+    <div><b>Log</b></div>
+    <pre id="log"></pre>
+  </div>
+</div>
 
 <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
 <script>
@@ -21,52 +59,96 @@ const logBox = document.getElementById("log");
 
 function log(msg) {
   logBox.textContent += msg + "\n";
+  logBox.scrollTop = logBox.scrollHeight;
+}
+
+function logJson(prefix, obj) {
+  log(prefix + " " + JSON.stringify(obj, null, 2));
+}
+
+function clearLog() {
+  logBox.textContent = "";
 }
 
 function connectUser() {
   const userId = document.getElementById("userId").value;
-  socket = io("http://localhost:5678");
+  const socketUrl = document.getElementById("socketUrl").value;
+  if (!userId || userId === "USER_ID_HERE") {
+    log("❌ Please enter a valid User ID");
+    return;
+  }
+  if (socket && socket.connected) {
+    log("ℹ️ Already connected: " + socket.id);
+    return;
+  }
+
+  socket = io(socketUrl);
 
   socket.on("connect", () => log("User connected: " + socket.id));
 
   socket.emit("user:connect", userId);
+  logJson("📤 user:connect", { userId });
+  socket.on("user:connect:ack", (d) => logJson("✅ user:connect:ack", d));
 
   // NEW RIDE ACCEPTED
   socket.on("user:rideAccepted", (data) => {
     log("🎉 Ride Accepted:");
-    log(JSON.stringify(data, null, 2));
+    logJson("", data);
     document.getElementById("rideId").value = data.ride._id;
   });
 
   // DRIVER ARRIVED
   socket.on("user:driverArrived", (data) => {
     log("📍 Driver Arrived:");
-    log(JSON.stringify(data, null, 2));
-    alert("Driver arrived! OTP = " + data.otp);
+    logJson("", data);
   });
 
   // RIDE STARTED
   socket.on("user:rideStarted", (data) => {
     log("🚗 Ride Started:");
-    log(JSON.stringify(data, null, 2));
+    logJson("", data);
   });
 
   // LIVE DRIVER LOCATION
   socket.on("driver:location", (loc) => {
-    log("📍 Driver location: " + JSON.stringify(loc));
+    logJson("📍 driver:location", loc);
   });
 
   // REACHED DESTINATION
   socket.on("user:reachedDestination", (data) => {
     log("📍 Reached Destination:");
-    log(JSON.stringify(data, null, 2));
+    logJson("", data);
   });
 
   // RIDE COMPLETED
   socket.on("user:rideCompleted", (data) => {
     log("🏁 Ride Completed:");
-    log(JSON.stringify(data, null, 2));
+    logJson("", data);
   });
+
+  socket.on("user:paidPayment:response", (d) => logJson("✅ user:paidPayment:response", d));
+  socket.on("disconnect", () => log("❌ Socket disconnected"));
+  socket.on("connect_error", (error) => log("❌ Connection error: " + error.message));
+}
+
+function disconnectUser() {
+  if (!socket) return;
+  socket.disconnect();
+}
+
+function emitPaidPayment() {
+  const userId = document.getElementById("userId").value;
+  const rideId = document.getElementById("rideId").value;
+  if (!socket || !socket.connected) {
+    log("❌ Socket not connected");
+    return;
+  }
+  if (!rideId) {
+    log("❌ Please enter rideId");
+    return;
+  }
+  logJson("📤 user:paidPayment", { rideId, userId });
+  socket.emit("user:paidPayment", { rideId, userId });
 }
 </script>
 </body>

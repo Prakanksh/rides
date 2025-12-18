@@ -7,6 +7,7 @@ const AdminSetting = require('../../models/adminSetting.model');
 const Notification = require('../../models/notification.model');
 const sendNotification = require('../../helpers/firebase-admin');
 const { sendEmail } = require('../../helpers/helper');
+const { resolveRideFare } = require('../../helpers/walletUtil');
 const _ = require('lodash');
 
 /**
@@ -188,7 +189,7 @@ async function processCashSettlements() {
         const rideIds = [];
 
         for (const ride of unsettledCashRides) {
-          const fare = ride.finalFare || ride.estimatedFare || 0;
+          const fare = resolveRideFare(ride, 0);
           if (fare > 0) {
             totalFare += fare;
             const adminShare = Number(((fare * adminPercent) / 100).toFixed(2));

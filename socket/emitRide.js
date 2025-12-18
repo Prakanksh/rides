@@ -1,7 +1,7 @@
 const Ride = require("../models/ride.model");
 const Driver = require("../models/driver.model");
 const Vehicle = require("../models/vehicle.model");
-const { ensureWallets, payByWallet, payByCash, confirmCashPayment } = require("../helpers/walletUtil");
+const { ensureWallets, payByWallet, payByCash, confirmCashPayment, resolveRideFare } = require("../helpers/walletUtil");
 let ioInstance = null;
 
 const {
@@ -165,18 +165,22 @@ function initSocketIO(io) {
           return; 
         }
         
-        if (ride.status !== "ongoing") { 
-          socket.emit("ride:reachedDestination:response", { success: false, message: "RIDE_NOT_STARTED" }); 
-          return; 
+        if (!["ongoing", "reachedDestination", "completed"].includes(ride.status)) {
+          socket.emit("ride:reachedDestination:response", { success: false, message: "RIDE_NOT_STARTED" });
+          return;
+        }
+        if (ride.status === "completed") {
+          socket.emit("ride:reachedDestination:response", { success: true, ride });
+          return;
         }
 
-        const finalFare = ride.finalFare > 0 ? ride.finalFare : (ride.estimatedFare || 0);
+        const finalFare = resolveRideFare(ride, 0);
         if (finalFare <= 0) {
           socket.emit("ride:reachedDestination:response", { success: false, message: "INVALID_FARE_AMOUNT" });
           return;
         }
         
-        ride.status = "reachedDestination";
+        if (ride.status === "ongoing") ride.status = "reachedDestination";
         
         // Calculate actual time if ride was started
         if (ride.startedAt) {
@@ -189,10 +193,24 @@ function initSocketIO(io) {
         await ride.save();
 
         await ensureWallets(ride.rider, driverId);
-        const result = ride.paymentMethod === "wallet" 
-          ? await payByWallet(ride, ride.rider, driverId, finalFare)
-          : await payByCash(ride, ride.rider, driverId, finalFare);
-          
+        if (ride.paymentMethod === "cash") {
+          ride.cashPaidByUser = false;
+          await ride.save();
+
+          const updatedRide = await Ride.findById(ride._id);
+          const riderSocket = getUserSocketId(ride.rider);
+          const amountToPay = Number(resolveRideFare(updatedRide, 0).toFixed(2));
+          if (riderSocket && ioInstance) ioInstance.to(riderSocket).emit("user:reachedDestination", { ride: updatedRide });
+          else if (ioInstance) ioInstance.to(`user:${ride.rider}`).emit("user:reachedDestination", { ride: updatedRide });
+          if (riderSocket && ioInstance) ioInstance.to(riderSocket).emit("user:paymentDue", { rideId: updatedRide._id, amountToPay, currency: "INR" });
+          else if (ioInstance) ioInstance.to(`user:${ride.rider}`).emit("user:paymentDue", { rideId: updatedRide._id, amountToPay, currency: "INR" });
+
+          socket.emit("ride:reachedDestination:response", { success: true, ride: updatedRide });
+          return;
+        }
+
+        const result = await payByWallet(ride, ride.rider, driverId, finalFare);
+
         if (!result.success) {
           socket.emit("ride:reachedDestination:response", { success: false, message: result.message });
           return;
@@ -240,30 +258,54 @@ function initSocketIO(io) {
           return;
         }
 
+        ride.cashPaidByUser = true;
+        await ride.save();
+
         if (ride.driver) {
-          const finalFare = ride.finalFare || ride.estimatedFare || 0;
           const driverSocket = getDriverSocketId(ride.driver);
           if (driverSocket && ioInstance) {
             ioInstance.to(driverSocket).emit("driver:paymentReceived", { 
               rideId: ride._id, 
               userId: userId,
-              finalFare: finalFare,
               ride: ride
             });
           } else if (ioInstance) {
             ioInstance.to(`driver:${ride.driver}`).emit("driver:paymentReceived", { 
               rideId: ride._id, 
               userId: userId,
-              finalFare: finalFare,
               ride: ride
             });
           }
         }
 
-        socket.emit("user:paidPayment:response", { success: true, message: "PAYMENT_NOTIFICATION_SENT" });
+        socket.emit("user:paidPayment:response", { success: true, message: "PAYMENT_MARKED" });
       } catch (e) {
         console.error("user:paidPayment err", e);
         socket.emit("user:paidPayment:response", { success: false, message: "SERVER_ERROR" });
+      }
+    });
+
+    socket.on("user:paymentDue", async (payload) => {
+      try {
+        const { rideId, userId } = payload || {};
+        if (!rideId || !userId) {
+          socket.emit("user:paymentDue:response", { success: false, message: "INVALID_PAYLOAD" });
+          return;
+        }
+        const ride = await Ride.findOne({ _id: rideId, rider: userId });
+        if (!ride) {
+          socket.emit("user:paymentDue:response", { success: false, message: "INVALID_RIDE" });
+          return;
+        }
+        if (ride.paymentMethod !== "cash" || ride.status !== "reachedDestination") {
+          socket.emit("user:paymentDue:response", { success: false, message: "INVALID_RIDE_STATE" });
+          return;
+        }
+        const amountToPay = Number(resolveRideFare(ride, 0).toFixed(2));
+        socket.emit("user:paymentDue:response", { success: true, rideId: ride._id, amountToPay, currency: "INR" });
+      } catch (e) {
+        console.error("user:paymentDue err", e);
+        socket.emit("user:paymentDue:response", { success: false, message: "SERVER_ERROR" });
       }
     });
 
@@ -290,13 +332,17 @@ function initSocketIO(io) {
           socket.emit("driver:receivedPayment:response", { success: false, message: "INVALID_RIDE_STATE", status: ride.status, paymentMethod: ride.paymentMethod });
           return;
         }
+        if (!ride.cashPaidByUser) {
+          socket.emit("driver:receivedPayment:response", { success: false, message: "USER_PAYMENT_NOT_CONFIRMED" });
+          return;
+        }
 
         if (ride.paidToDriver) {
           socket.emit("driver:receivedPayment:response", { success: false, message: "PAYMENT_ALREADY_CONFIRMED" });
           return;
         }
 
-        const finalFare = ride.finalFare > 0 ? ride.finalFare : (ride.estimatedFare || 0);
+        const finalFare = resolveRideFare(ride, 0);
         if (finalFare <= 0) {
           socket.emit("driver:receivedPayment:response", { success: false, message: "INVALID_FARE_AMOUNT", finalFare: finalFare, estimatedFare: ride.estimatedFare });
           return;

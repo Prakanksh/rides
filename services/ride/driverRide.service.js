@@ -3,7 +3,7 @@ const Driver = require("../../models/driver.model");
 const Vehicle = require("../../models/vehicle.model");
 const User = require("../../models/user.model");
 const { responseData } = require("../../helpers/responseData");
-const { ensureWallets, payByWallet, payByCash, confirmCashPayment } = require("../../helpers/walletUtil");
+const { ensureWallets, payByWallet, payByCash, confirmCashPayment, resolveRideFare } = require("../../helpers/walletUtil");
 const { sendToUser, sendRideToDriver } = require("../../socket/emitRide");
 const { calculateActualTime } = require("../../helpers/etaCalculator");
 
@@ -39,11 +39,10 @@ module.exports = {
       if (!vehicle) {
         return res.json(responseData("NO_ACTIVE_VEHICLE", {}, req, false));
       }
-      const normalizedVehicleType = vehicle.type === "prime-sedan" ? "prime sedan" : vehicle.type;
 
       const baseQuery = {
         status: { $in: ["requested", "scheduled_ready"] },
-        vehicleType: normalizedVehicleType,
+        vehicleType: vehicle.type,
         cancelledDrivers: { $ne: driverId }
       };
 
@@ -149,12 +148,26 @@ module.exports = {
       });
 
       if (!ride) return res.json(responseData("INVALID_RIDE", {}, req, false));
-      if (ride.status !== "ongoing") {
+      // Idempotent + correct flow:
+      // - allow ongoing -> reachedDestination
+      // - allow reachedDestination (retry payment if needed)
+      // - completed rides should not error
+      if (!["ongoing", "reachedDestination", "completed"].includes(ride.status)) {
         return res.json(responseData("RIDE_NOT_STARTED", {}, req, false));
       }
+      if (ride.status === "completed") {
+        return res.json(responseData("RIDE_COMPLETED", { ride }, req, true));
+      }
 
-      const finalFare = ride.finalFare || ride.estimatedFare;
-      ride.status = "reachedDestination";
+      const finalFare = resolveRideFare(ride, 0);
+      if (finalFare <= 0) {
+        return res.json(responseData("INVALID_FARE_AMOUNT", {}, req, false));
+      }
+
+      // Only set reachedDestination if we are coming from ongoing.
+      if (ride.status === "ongoing") {
+        ride.status = "reachedDestination";
+      }
       
       if (ride.startedAt) {
         const now = new Date();
@@ -165,24 +178,22 @@ module.exports = {
       await ride.save();
 
       await ensureWallets(ride.rider, req.user._id);
-      
-      if (ride.paymentMethod === "wallet") {
-        const result = await payByWallet(ride, ride.rider, req.user._id, finalFare);
-        if (!result.success) {
-          return res.json(responseData(result.message, {}, req, false));
-        }
+
+      if (ride.paymentMethod === "cash") {
+        ride.cashPaidByUser = false;
+        await ride.save();
         const updatedRide = await Ride.findById(ride._id);
-        sendToUser(ride.rider.toString(), "user:rideCompleted", { ride: updatedRide });
-        return res.json(responseData("RIDE_COMPLETED", { ride: updatedRide }, req, true));
-      } else {
-        const result = await payByCash(ride, ride.rider, req.user._id, finalFare);
-        if (!result.success) {
-          return res.json(responseData(result.message, {}, req, false));
-        }
-        const updatedRide = await Ride.findById(ride._id);
-        sendToUser(ride.rider.toString(), "user:rideCompleted", { ride: updatedRide });
-        return res.json(responseData("RIDE_COMPLETED", { ride: updatedRide }, req, true));
+        sendToUser(ride.rider.toString(), "user:reachedDestination", { ride: updatedRide });
+        return res.json(responseData("REACHED_DESTINATION", { ride: updatedRide }, req, true));
       }
+
+      const result = await payByWallet(ride, ride.rider, req.user._id, finalFare);
+      if (!result.success) {
+        return res.json(responseData(result.message, {}, req, false));
+      }
+      const updatedRide = await Ride.findById(ride._id);
+      sendToUser(ride.rider.toString(), "user:rideCompleted", { ride: updatedRide });
+      return res.json(responseData("RIDE_COMPLETED", { ride: updatedRide }, req, true));
     } catch (error) {
       console.error("reachedDestination err", error);
       return res.json(responseData(error.message || "SOMETHING_WENT_WRONG", {}, req, false));
@@ -200,11 +211,14 @@ module.exports = {
       if (ride.status !== "reachedDestination" || ride.paymentMethod !== "cash") {
         return res.json(responseData("INVALID_RIDE_STATE", {}, req, false));
       }
+      if (!ride.cashPaidByUser) {
+        return res.json(responseData("USER_PAYMENT_NOT_CONFIRMED", {}, req, false));
+      }
       if (ride.paidToDriver) {
         return res.json(responseData("PAYMENT_ALREADY_CONFIRMED", {}, req, false));
       }
 
-      const finalFare = ride.finalFare || ride.estimatedFare || 0;
+      const finalFare = resolveRideFare(ride, 0);
       if (finalFare <= 0) {
         return res.json(responseData("INVALID_FARE_AMOUNT", {}, req, false));
       }

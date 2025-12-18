@@ -2,32 +2,71 @@
 <html>
 <head>
   <title>Driver Socket Test</title>
+  <style>
+    body { font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; padding: 16px; }
+    input { width: 420px; padding: 6px 8px; margin: 4px 0; }
+    button { margin: 4px 6px 4px 0; padding: 6px 10px; }
+    .row { margin: 8px 0; }
+    .muted { color: #666; font-size: 12px; }
+    pre { background: #0b1020; color: #d7e3ff; padding: 12px; border-radius: 8px; overflow: auto; height: 420px; }
+    .two { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .card { border: 1px solid #e7e7e7; border-radius: 10px; padding: 12px; }
+  </style>
 </head>
 <body>
 <h2>Driver Socket Test</h2>
 
-Driver ID: <input id="driverId" value="DRIVER_ID_HERE" />  
-<button onclick="connectDriver()">Connect Driver</button>
-<br/><br/>
+<div class="two">
+  <div class="card">
+    <div class="row">
+      <div><b>Socket URL</b></div>
+      <input id="socketUrl" value="http://localhost:5678" />
+      <div class="muted">Must match your server socket URL/port.</div>
+    </div>
 
-<button onclick="goOnline()">Go Online</button>
-<br/><br/>
+    <div class="row">
+      <div><b>Driver ID</b></div>
+      <input id="driverId" value="DRIVER_ID_HERE" />
+      <button onclick="connectDriver()">Connect</button>
+      <button onclick="disconnectDriver()">Disconnect</button>
+      <button onclick="goOnline()">driver:online</button>
+    </div>
 
-<button onclick="sendLocation()">Send Random Location</button>
-<br/><br/>
+    <div class="row">
+      <div><b>Ride ID</b></div>
+      <input id="rideId" placeholder="Paste ride id or wait for ride:new" />
+      <div class="muted">When a ride comes in via <code>ride:new</code> we auto-fill this.</div>
+    </div>
 
-Ride ID: <input id="rideId" />
-<br/><br/>
+    <div class="row">
+      <button onclick="acceptRide()">ride:accept</button>
+      <button onclick="arrived()">ride:arrived</button>
+      <button onclick="startRide()">ride:start</button>
+      <input id="otpInput" placeholder="OTP (from accept response or DB)" />
+    </div>
 
-<button onclick="acceptRide()">Accept Ride</button>
-<button onclick="arrived()">Arrived</button>
-<button onclick="startRide()">Start Ride (Requires OTP)</button>
-<input id="otpInput" placeholder="Enter OTP" />
-<br/><br/>
+    <div class="row">
+      <button onclick="reachedDestination()">ride:reachedDestination</button>
+      <button onclick="receivedPayment()">driver:receivedPayment (cash only)</button>
+    </div>
 
-<button onclick="reachedDestination()">Reached Destination</button>
+    <div class="row">
+      <button onclick="sendLocation()">driver:location (random)</button>
+      <button onclick="clearLog()">Clear log</button>
+    </div>
 
-<pre id="log"></pre>
+    <div class="muted">
+      Notes:
+      - Cash rides: server may complete immediately or may require payment confirm depending on backend flow.
+      - Wallet rides: server should complete immediately.
+    </div>
+  </div>
+
+  <div class="card">
+    <div><b>Log</b></div>
+    <pre id="log"></pre>
+  </div>
+</div>
 
 <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
 <script>
@@ -36,16 +75,31 @@ let logBox = document.getElementById("log");
 
 function log(msg) {
   logBox.textContent += msg + "\n";
+  logBox.scrollTop = logBox.scrollHeight;
+}
+
+function logJson(prefix, obj) {
+  log(prefix + " " + JSON.stringify(obj, null, 2));
+}
+
+function clearLog() {
+  logBox.textContent = "";
 }
 
 function connectDriver() {
   const driverId = document.getElementById("driverId").value;
+  const socketUrl = document.getElementById("socketUrl").value;
   if (!driverId || driverId === "DRIVER_ID_HERE") {
     log("❌ Please enter a valid Driver ID");
     return;
   }
+
+  if (socket && socket.connected) {
+    log("ℹ️ Already connected: " + socket.id);
+    return;
+  }
   
-  socket = io("http://localhost:5678");
+  socket = io(socketUrl);
 
   socket.on("connect", () => {
     log("✅ Socket connected: " + socket.id);
@@ -62,15 +116,23 @@ function connectDriver() {
   // Receive new ride request
   socket.on("ride:new", (ride) => {
     log("🚕 NEW RIDE RECEIVED:");
-    log(JSON.stringify(ride, null, 2));
+    logJson("", ride);
     document.getElementById("rideId").value = ride._id;
   });
 
   // responses
-  socket.on("ride:accept:response", (d) => log("ACCEPT RESPONSE: " + JSON.stringify(d)));
-  socket.on("ride:arrived:response", (d) => log("ARRIVED RESPONSE: " + JSON.stringify(d)));
-  socket.on("ride:start:response", (d) => log("START RESPONSE: " + JSON.stringify(d)));
-  socket.on("ride:reachedDestination:response", (d) => log("REACHED DESTINATION RESPONSE: " + JSON.stringify(d)));
+  socket.on("ride:accept:response", (d) => {
+    logJson("✅ ride:accept:response", d);
+    if (d && d.otp) document.getElementById("otpInput").value = d.otp;
+  });
+  socket.on("ride:arrived:response", (d) => logJson("✅ ride:arrived:response", d));
+  socket.on("ride:start:response", (d) => logJson("✅ ride:start:response", d));
+  socket.on("ride:reachedDestination:response", (d) => logJson("✅ ride:reachedDestination:response", d));
+  socket.on("driver:receivedPayment:response", (d) => logJson("✅ driver:receivedPayment:response", d));
+
+  // server-to-driver notifications
+  socket.on("driver:rideCompleted", (d) => logJson("🏁 driver:rideCompleted", d));
+  socket.on("driver:paymentReceived", (d) => logJson("💵 driver:paymentReceived", d));
   
   socket.on("disconnect", () => {
     log("❌ Socket disconnected");
@@ -79,6 +141,11 @@ function connectDriver() {
   socket.on("connect_error", (error) => {
     log("❌ Connection error: " + error.message);
   });
+}
+
+function disconnectDriver() {
+  if (!socket) return;
+  socket.disconnect();
 }
 
 function goOnline() {
@@ -108,12 +175,14 @@ function sendLocation() {
 function acceptRide() {
   const driverId = document.getElementById("driverId").value;
   const rideId = document.getElementById("rideId").value;
+  logJson("📤 ride:accept", { rideId, driverId });
   socket.emit("ride:accept", { rideId, driverId });
 }
 
 function arrived() {
   const driverId = document.getElementById("driverId").value;
   const rideId = document.getElementById("rideId").value;
+  logJson("📤 ride:arrived", { rideId, driverId });
   socket.emit("ride:arrived", { rideId, driverId });
 }
 
@@ -121,13 +190,22 @@ function startRide() {
   const driverId = document.getElementById("driverId").value;
   const rideId = document.getElementById("rideId").value;
   const otp = document.getElementById("otpInput").value;
+  logJson("📤 ride:start", { rideId, driverId, otp });
   socket.emit("ride:start", { rideId, driverId, otp });
 }
 
 function reachedDestination() {
   const driverId = document.getElementById("driverId").value;
   const rideId = document.getElementById("rideId").value;
+  logJson("📤 ride:reachedDestination", { rideId, driverId });
   socket.emit("ride:reachedDestination", { rideId, driverId });
+}
+
+function receivedPayment() {
+  const driverId = document.getElementById("driverId").value;
+  const rideId = document.getElementById("rideId").value;
+  logJson("📤 driver:receivedPayment", { rideId, driverId });
+  socket.emit("driver:receivedPayment", { rideId, driverId });
 }
 </script>
 </body>
