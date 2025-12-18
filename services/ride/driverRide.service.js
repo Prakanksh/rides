@@ -146,7 +146,7 @@ module.exports = {
         _id: req.body.rideId,
         driver: req.user._id
       });
-
+      
       if (!ride) return res.json(responseData("INVALID_RIDE", {}, req, false));
       // Idempotent + correct flow:
       // - allow ongoing -> reachedDestination
