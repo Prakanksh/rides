@@ -15,7 +15,7 @@ module.exports = {
   // New flow: User selects vehicle and creates ride (updates existing ride from estimate)
   createRide: async (req, res) => {
     try {
-      const { pickupLocation, dropLocation, vehicleType, paymentMethod, distanceKm, fare, promoCode } = req.body;
+      const { pickupLocation, dropLocation, vehicleType, paymentMethod, promoCode } = req.body;
       const { rideId } = req.params;
 
       const riderId = req.user?._id;
@@ -51,7 +51,7 @@ module.exports = {
 
       const [pickupLng, pickupLat] = pickupLocation.coordinates;
       const [dropLng, dropLat] = dropLocation.coordinates;
-      const distance = distanceKm || existingRide.distance;
+      const distance = calculateDistanceInKm(pickupLat, pickupLng, dropLat, dropLng);
       const normalizedVehicleType = vehicleType === "prime sedan" ? "prime-sedan" : vehicleType;
 
       const etaData = await calculateETA({
@@ -84,7 +84,8 @@ module.exports = {
       }
 
       // Calculate promo discount if promo code is provided
-      const originalFare = fare || 0;
+      const fareResult = calculateFare(distance, { vehicleType: normalizedVehicleType });
+      const originalFare = Number((fareResult?.estimatedFare || 0).toFixed(2));
       let discountAmount = 0;
       let finalFare = originalFare;
       
@@ -102,7 +103,7 @@ module.exports = {
         {
           pickupLocation,
           dropLocation,
-          distance: Number((distanceKm || existingRide.distance).toFixed(2)),
+          distance: Number(distance.toFixed(2)),
           estimatedFare: [],
           finalFare: finalFare,
           originalFare: originalFare,
@@ -375,7 +376,7 @@ module.exports = {
   scheduleRide: async (req, res) => {
     try {
       const { rideId } = req.params;
-      const { vehicleType, paymentMethod, scheduledFor, distanceKm, fare, promoCode } = req.body;
+      const { vehicleType, paymentMethod, scheduledFor, promoCode } = req.body;
       const riderId = req.user?._id;
 
       if (!riderId) {
@@ -437,7 +438,7 @@ module.exports = {
 
       const [pickupLng, pickupLat] = existingRide.pickupLocation.coordinates;
       const [dropLng, dropLat] = existingRide.dropLocation.coordinates;
-      const distance = distanceKm || existingRide.distance || calculateDistanceInKm(pickupLat, pickupLng, dropLat, dropLng);
+      const distance = calculateDistanceInKm(pickupLat, pickupLng, dropLat, dropLng);
       const normalizedVehicleType = vehicleType === "prime sedan" ? "prime-sedan" : vehicleType;
 
       const etaData = await calculateETA({
@@ -484,7 +485,8 @@ module.exports = {
       }
 
       // Calculate promo discount if promo code is provided
-      const originalFare = fare || 0;
+      const fareResult = calculateFare(distance, { vehicleType: normalizedVehicleType });
+      const originalFare = Number((fareResult?.estimatedFare || 0).toFixed(2));
       let discountAmount = 0;
       let finalFare = originalFare;
       
