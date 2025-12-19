@@ -6,7 +6,8 @@ const AdminSettingSchema = new mongoose.Schema(
   {
     commissionPercentage: { type: Number, default: 30 },  // Admin cut
     cancellationFee: { type: Number, default: 20 },
-    minimumFare: { type: Number, default: 25 }
+    minimumFare: { type: Number, default: 25 },
+    driverCancelationFee: { type: Number, default: 5 }
   },
   { timestamps: true }
 );

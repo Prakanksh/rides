@@ -6,6 +6,8 @@ const { responseData } = require("../../helpers/responseData");
 const { ensureWallets, payByWallet, payByCash, confirmCashPayment, resolveRideFare } = require("../../helpers/walletUtil");
 const { sendToUser, sendRideToDriver } = require("../../socket/emitRide");
 const { calculateActualTime } = require("../../helpers/etaCalculator");
+const adminSetting = require("../../models/setting.model");
+const adminSettingModel = require("../../models/adminSetting.model");
 
 const genOtp = () => String(Math.floor(1000 + Math.random() * 9000));
 
@@ -251,7 +253,25 @@ module.exports = {
     if (ride.status === "ongoing" || ride.status === "reachedDestination") {
       return res.json(responseData("CANNOT_CANCEL_RIDE_IN_PROGRESS", {}, req, false));
     }
+   if (ride.status === "accepted" || ride.status === "arrived") {
+   
+const penaltySetting = await adminSettingModel.findOne({ key: "driverCancellationPenalties" });
 
+const penaltyPercentage = penaltySetting ? parseFloat(penaltySetting.driverCancelationFee) : 5;
+
+const paneltyCharege = ride.finalFare * penaltyPercentage / 100;
+
+ await Driver.findByIdAndUpdate(
+    driverId,
+    { 
+        $inc: { 
+            penalties: paneltyCharege
+        } 
+    },
+    { new: true }
+);
+
+    }
     ride.cancelledDrivers.push(driverId);
     ride.driver = null;
     ride.status = "requested";

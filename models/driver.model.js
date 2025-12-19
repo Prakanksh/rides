@@ -75,7 +75,8 @@ const DriverSchema = new mongoose.Schema(
     notifications: {
       type: Boolean,
       default: true
-    }
+    },
+    penalties: { type: Number, default: 0  }
   },
   { timestamps: true, versionKey: false }
 );
