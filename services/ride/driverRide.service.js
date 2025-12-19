@@ -9,6 +9,7 @@ const { calculateActualTime } = require("../../helpers/etaCalculator");
 const adminSetting = require("../../models/setting.model");
 const adminSettingModel = require("../../models/adminSetting.model");
 
+// eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJsb2NhdGlvbiI6eyJ0eXBlIjoiUG9pbnQiLCJjb29yZGluYXRlcyI6Wzc3LjYyLDEyLjk3NDhdfSwiZGV2aWNlSWQiOm51bGwsImRldmljZVR5cGUiOm51bGwsImRldmljZVRva2VuIjpudWxsLCJfaWQiOiI2OTM5NTI4ZTI1MGI0OTk3ZWNkZDRjZTAiLCJtb2JpbGUiOiI5ODc2NTQzMjEwIiwiZW1haWwiOiJkcml2ZXIzQGV4YW1wbGUuY29tIiwiZmlyc3ROYW1lIjoiQW1pdCIsImxhc3ROYW1lIjoiVmVybWEiLCJkb2IiOiIxOTkwLTA3LTIyIiwiY291bnRyeUNvZGUiOiIrOTEiLCJwcmltYXJ5TW9iaWxlIjoiOTg3NjU0MzIxMCIsInNlY29uZGFyeU1vYmlsZSI6IjkxMjM0NTY3ODkiLCJibG9vZEdyb3VwIjoiTysiLCJjaXR5IjoiTXVtYmFpIiwiYWRkcmVzcyI6IlNlY3RvciAxNSwgQW5kaGVyaSBFYXN0Iiwic3RhdGUiOiJNYWhhcmFzaHRyYSIsImxhbmd1YWdlcyI6WyJIaW5kaSIsIk1hcmF0aGkiLCJFbmdsaXNoIl0sInByb2ZpbGUiOiIiLCJ3YWxsZXQiOjAsImlzQXZhaWxhYmxlIjp0cnVlLCJyZWdpc3RyYXRpb25TdGF0dXMiOiJhcHByb3ZlZCIsInJlamVjdGlvblJlYXNvbiI6IiIsInN0YXR1cyI6ImFjdGl2ZSIsImlzRW1haWxWZXJpZmllZCI6ZmFsc2UsImlzTW9iaWxlVmVyaWZpZWQiOmZhbHNlLCJjcmVhdGVkQXQiOiIyMDI1LTEyLTEwVDEwOjU5OjI2LjU2M1oiLCJ1cGRhdGVkQXQiOiIyMDI1LTEyLTE5VDA3OjE4OjA4LjM1NFoiLCJyb2xlIjoiZHJpdmVyIiwiaXNEZWxldGVkIjpmYWxzZSwiZHJpdmVyQ29tbWlzc2lvbiI6MTM3LjE3LCJub3RpZmljYXRpb25zIjp0cnVlLCJwZW5hbHRpZXMiOjcuMTg3LCJpYXQiOjE3NjYxMzE2MjEsImV4cCI6MTc2NjkxODE2Nn0.L6iele0kdCsSUwt31k0iC33EHRvMCsVq5HLxX0Bh8hM
 const genOtp = () => String(Math.floor(1000 + Math.random() * 9000));
 
 module.exports = {
@@ -295,7 +296,7 @@ const paneltyCharege = ride.finalFare * penaltyPercentage / 100;
     if (driverIdsWithMatchingVehicle.length === 0) {
       sendToUser(ride.rider.toString(), "user:searchingDriver", { 
         ride, 
-        message: "Your driver cancelled. Finding new driver..." 
+        message: "Your driver cancelled. Finding new driver..."
       });
       return res.json(responseData("RIDE_SEARCHING_DRIVER", { ride, newDriverAssigned: false }, req, true));
     }
