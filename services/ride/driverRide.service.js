@@ -151,12 +151,16 @@ module.exports = {
       });
       
       if (!ride) return res.json(responseData("INVALID_RIDE", {}, req, false));
-      // Idempotent + correct flow:
-      // - allow ongoing -> reachedDestination
-      // - allow reachedDestination (retry payment if needed)
-      // - completed rides should not error
-      if (!["ongoing", "reachedDestination", "completed"].includes(ride.status)) {
-        return res.json(responseData("RIDE_NOT_STARTED", {}, req, false));
+      if (ride.paymentMethod === "wallet") {
+        if (!["ongoing", "completed"].includes(ride.status)) {
+          return res.json(responseData("INVALID_RIDE_STATE", { currentStatus: ride.status }, req, false));
+        }
+      } else if (ride.paymentMethod === "cash") {
+        if (!["ongoing", "reachedDestination", "completed"].includes(ride.status)) {
+          return res.json(responseData("INVALID_RIDE_STATE", { currentStatus: ride.status }, req, false));
+        }
+      } else {
+        return res.json(responseData("INVALID_PAYMENT_METHOD", {}, req, false));
       }
       if (ride.status === "completed") {
         return res.json(responseData("RIDE_COMPLETED", { ride }, req, true));

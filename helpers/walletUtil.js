@@ -4,6 +4,7 @@ const Admin = require("../models/admin.model");
 const Transaction = require("../models/transactions.model");
 const AdminSetting = require("../models/adminSetting.model");
 const { calculateActualTime } = require("./etaCalculator");
+const { updatePromoCodeUsage } = require("./promoUtil");
 
 function normalizeVehicleTypeForEstimate(vehicleType) {
   if (!vehicleType) return null;
@@ -161,6 +162,10 @@ async function payByWallet(ride, userId, driverId, finalFare) {
   
   await ride.save();
 
+  if (ride.promoCode) {
+    await updatePromoCodeUsage(ride.promoCode, userId);
+  }
+
   // driver availability is handled on ride completion, not settlement
   if (driverId) await Driver.findByIdAndUpdate(driverId, { isAvailable: true });
 
@@ -255,6 +260,10 @@ async function payByCash(ride, userId, driverId, finalFare) {
   
   await ride.save();
 
+  if (ride.promoCode) {
+    await updatePromoCodeUsage(ride.promoCode, userId);
+  }
+
   if (driverId) {
     await Driver.findByIdAndUpdate(driverId, { isAvailable: true });
   }
@@ -343,6 +352,10 @@ async function confirmCashPayment(ride, userId, driverId, finalFare) {
   }
   
   await ride.save();
+
+  if (ride.promoCode) {
+    await updatePromoCodeUsage(ride.promoCode, userId);
+  }
 
   if (driverId) {
     await Driver.findByIdAndUpdate(driverId, { isAvailable: true });

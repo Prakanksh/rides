@@ -45,8 +45,51 @@ async function calculateDiscount(promoCode, originalFare) {
   }
 }
 
+/**
+ * Update promo code usage when a ride completes
+ * Atomically increments usedCount and adds to usageHistory
+ * Note: Updates even if promo is later deactivated (usage happened when it was active)
+ * @param {String} promoCode - Promo code string
+ * @param {String|ObjectId} userId - User ID who used the promo
+ * @returns {Promise<Boolean>} - true if updated, false if not found/invalid
+ */
+async function updatePromoCodeUsage(promoCode, userId) {
+  if (!promoCode || !userId) {
+    return false;
+  }
+
+  try {
+    // Find promo code regardless of active status (usage happened when it was active)
+    const promo = await promoCodeModel.findOne({ code: promoCode });
+    
+    if (!promo) {
+      return false;
+    }
+
+    // Atomically increment usedCount and add to usageHistory
+    await promoCodeModel.updateOne(
+      { _id: promo._id },
+      {
+        $inc: { usedCount: 1 },
+        $push: {
+          usageHistory: {
+            userId: userId,
+            usedAt: new Date()
+          }
+        }
+      }
+    );
+
+    return true;
+  } catch (error) {
+    console.error("Error updating promo code usage:", error);
+    return false;
+  }
+}
+
 module.exports = {
-  calculateDiscount
+  calculateDiscount,
+  updatePromoCodeUsage
 };
 
 
