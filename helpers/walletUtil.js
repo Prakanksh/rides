@@ -153,6 +153,16 @@ async function payByWallet(ride, userId, driverId, finalFare) {
   
   await ride.save();
 
+  if (ride.cancellationPenalty > 0) {
+    const user = await User.findById(userId);
+    if (user && user.cancellationPenalty > 0) {
+      const penaltyToClear = Number((ride.cancellationPenalty || 0).toFixed(2));
+      const currentPenalty = Number((user.cancellationPenalty || 0).toFixed(2));
+      user.cancellationPenalty = Math.max(0, Number((currentPenalty - penaltyToClear).toFixed(2)));
+      await user.save();
+    }
+  }
+
   if (ride.promoCode) {
     await updatePromoCodeUsage(ride.promoCode, userId);
   }
@@ -251,6 +261,17 @@ async function payByCash(ride, userId, driverId, finalFare) {
   
   await ride.save();
 
+  // Clear cancellation penalty after payment
+  if (ride.cancellationPenalty > 0) {
+    const user = await User.findById(userId);
+    if (user && user.cancellationPenalty > 0) {
+      const penaltyToClear = Number((ride.cancellationPenalty || 0).toFixed(2));
+      const currentPenalty = Number((user.cancellationPenalty || 0).toFixed(2));
+      user.cancellationPenalty = Math.max(0, Number((currentPenalty - penaltyToClear).toFixed(2)));
+      await user.save();
+    }
+  }
+
   if (ride.promoCode) {
     await updatePromoCodeUsage(ride.promoCode, userId);
   }
@@ -343,6 +364,17 @@ async function confirmCashPayment(ride, userId, driverId, finalFare) {
   }
   
   await ride.save();
+
+  // Clear cancellation penalty after payment
+  if (ride.cancellationPenalty > 0) {
+    const user = await User.findById(userId);
+    if (user && user.cancellationPenalty > 0) {
+      const penaltyToClear = Number((ride.cancellationPenalty || 0).toFixed(2));
+      const currentPenalty = Number((user.cancellationPenalty || 0).toFixed(2));
+      user.cancellationPenalty = Math.max(0, Number((currentPenalty - penaltyToClear).toFixed(2)));
+      await user.save();
+    }
+  }
 
   if (ride.promoCode) {
     await updatePromoCodeUsage(ride.promoCode, userId);
