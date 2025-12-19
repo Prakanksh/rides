@@ -63,14 +63,12 @@ module.exports = {
       if (promo.expiryDate < new Date()) {
         return res.json(responseData("PROMO_CODE_EXPIRED", {}, req, false));
       }
-      // console.log(promo.usageLimit, promo.usedCount,"usage")
 
   if (promo.usageLimit > 0 && promo.usedCount >= promo.usageLimit) {
      return res.json(responseData("PROMO_CODE_USAGE_LIMIT_EXCEEDED", {}, req, false));
  
     
   }
-// console.log(existingRide.rider)
   // Per-user usage limit
   const userUsageCount = await Ride.countDocuments({
     rider: existingRide.rider,
@@ -277,13 +275,11 @@ module.exports = {
   applyPromo: async (req, res) => {
     try {
       const { code, userId, rideId } = req.body;
-// console.log(req.body)
       if (!code) {
         return res.json(responseData("PROMO_CODE_REQUIRED", {}, req, false));
       }
 
       const promo = await promoCodeModel.findOne({ code, isActive: true });
-// console.log(promo,"promo")
       if (!promo) {
         return res.json(responseData("INVALID_PROMO_CODE", {}, req, false));
       }
@@ -291,7 +287,6 @@ module.exports = {
       if (promo.expiryDate < new Date()) {
         return res.json(responseData("PROMO_CODE_EXPIRED", {}, req, false));
       }
-      console.log(promo.usageLimit, promo.usedCount,"usage")
 
   if (promo.usageLimit > 0 && promo.usedCount >= promo.usageLimit) {
      return res.json(responseData("PROMO_CODE_USAGE_LIMIT_EXCEEDED", {}, req, false));
@@ -313,7 +308,6 @@ module.exports = {
     ]
   }
   });
-// console.log(promo.perUserLimit,userUsageCount,"usage")
   if (promo.perUserLimit > 0 && userUsageCount >= promo.perUserLimit) {
     
       return res.json(responseData("PROMO_CODE_PER_USER_LIMIT_EXCEEDED", {}, req, false));
