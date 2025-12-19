@@ -10,18 +10,6 @@ const { sendEmail } = require('../../helpers/helper');
 const { resolveRideFare } = require('../../helpers/walletUtil');
 const _ = require('lodash');
 
-/**
- * ============================================
- * NOTIFICATION FUNCTIONS (Built exactly like sendNotificationAndroidIos)
- * ============================================
- */
-
-/**
- * Send notification to driver (Android & iOS) - Built exactly like sendNotificationAndroidIos
- * @param {Object} receiverDriver - Driver object with deviceType, deviceToken, notifications fields
- * @param {String} title - Notification title
- * @param {String} description - Notification description
- */
 async function sendNotificationAndroidIosDriver(receiverDriver, title, description) {
   await Notification.create({
     userId: receiverDriver?._id,
@@ -69,14 +57,6 @@ async function sendNotificationAndroidIosDriver(receiverDriver, title, descripti
   // }
 }
 
-/**
- * Send settlement success notification to driver
- * @param {Object} driver - Driver object
- * @param {Number} rideCount - Number of rides settled
- * @param {Number} totalFare - Total fare amount
- * @param {Number} driverShare - Driver's share amount
- * @param {Number} adminShare - Admin's share amount
- */
 async function notifyDriverSettlementSuccess(driver, rideCount, totalFare, driverShare, adminShare) {
   try {
     const driverWithNotifications = await Driver.findById(driver._id)
@@ -95,12 +75,6 @@ async function notifyDriverSettlementSuccess(driver, rideCount, totalFare, drive
   }
 }
 
-/**
- * Send insufficient balance notification to driver
- * @param {Object} driver - Driver object
- * @param {Number} requiredAmount - Required amount
- * @param {Number} availableAmount - Available amount in driverCommission
- */
 async function notifyDriverInsufficientBalance(driver, requiredAmount, availableAmount) {
   try {
     const driverWithNotifications = await Driver.findById(driver._id)
@@ -119,25 +93,6 @@ async function notifyDriverInsufficientBalance(driver, requiredAmount, available
   }
 }
 
-/**
- * ============================================
- * END OF NOTIFICATION FUNCTIONS
- * ============================================
- */
-
-/**
- * Cash Settlement Cron Job
- * 
- * This cron job processes cash payment settlements for all drivers:
- * 1. Finds all completed cash rides that haven't been settled to admin
- * 2. For each driver, calculates total fare and splits it:
- *    - Admin's share (30%) goes to admin.wallet
- *    - Driver's share (70%) goes to driver.wallet
- * 3. Deducts total fare from driver.driverCommission
- * 4. Creates a transaction from driver to admin
- * 5. Marks rides as paidToAdmin: true and paymentSuccessful: true
- * 6. Sends notifications to drivers (if enabled)
- */
 async function processCashSettlements() {
   try {
     console.log("🔄 Starting cash payment settlement cron job...");

@@ -168,13 +168,13 @@ module.exports = {
         return res.json(responseData("RIDE_UPDATE_FAILED", {}, req, false));
       }
 
-      // Find drivers with matching vehicle type
+      // Find vehicles with matching vehicle type
       const vehiclesWithMatchingType = await Vehicle.find({
         type: normalizedVehicleType,
         status: "active"
       }).select("driver").lean();
       
-      const driverIdsWithMatchingVehicle = vehiclesWithMatchingType.map(v => v.driver);
+      const driverIdsWithMatchingVehicle = vehiclesWithMatchingType.map(v => v.driver).filter(id => id != null);
       
       if (driverIdsWithMatchingVehicle.length === 0) {
         return res.json(
@@ -187,7 +187,7 @@ module.exports = {
         );
       }
 
-      // Find nearby available drivers
+      // Find nearby available drivers (only those that actually exist)
       const nearbyDrivers = await Driver.find({
         _id: { $in: driverIdsWithMatchingVehicle },
         isAvailable: true,

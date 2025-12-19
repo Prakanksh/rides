@@ -12,15 +12,6 @@ function normalizeVehicleTypeForEstimate(vehicleType) {
   return vehicleType;
 }
 
-/**
- * Returns a numeric fare for a ride.
- * - `overrideFare` wins if it is > 0
- * - then ride.finalFare if > 0
- * - then ride.estimatedFare:
- *    - if number: use it
- *    - if array: pick by ride.vehicleType
- * - otherwise 0
- */
 function resolveRideFare(ride, overrideFare) {
   const o = Number(overrideFare || 0);
   if (o > 0) return o;
