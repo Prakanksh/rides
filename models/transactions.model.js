@@ -60,7 +60,7 @@ const TransactionSchema = new mongoose.Schema(
         "refund",
         "penalty",
         "bonus",
-        "subscription_payment"
+        "subscription_payment","penality_settlement"
       ],
       required: false
     },

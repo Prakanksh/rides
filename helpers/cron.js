@@ -8,6 +8,7 @@ const moment = require("moment");
 const rideModel = require("../models/ride.model");
 const { activateScheduledRides } = require("../services/cron/scheduledRides.cron");
 const { autoCancelRides } = require("../services/cron/autoCancelRides.cron");
+const { penalitySettlementCron } = require("../services/cron/penalitySettlement.cron");
 // const { cashSettlementSchedule, walletSettlementSchedule } = require("../configs/cron.config");
 
 let crons = {
@@ -65,5 +66,13 @@ job.start();
         });
         job.start();
     },
-};
+    penalitySettlement: async () => {
+        console.log("⚖️ Penality settlement cron: Every day at midnight");
+        let job = cron.schedule("*/1 * * * *", async () => {
+            console.log("Penality Settlement Cron Running");
+            await penalitySettlementCron();
+        })
+        job.start();
+}
+}
 module.exports = crons;
