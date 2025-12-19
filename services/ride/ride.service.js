@@ -17,6 +17,7 @@ module.exports = {
     try {
       const { pickupLocation, dropLocation, vehicleType, paymentMethod, promoCode } = req.body;
       const { rideId } = req.params;
+      console.log(req.body)
 
       const riderId = req.user?._id;
       if (!riderId) {
@@ -24,6 +25,7 @@ module.exports = {
       }
 
       const existingRide = await Ride.findOne({ _id: rideId, rider: riderId });
+
       if (!existingRide) {
         return res.json(responseData("RIDE_NOT_FOUND", {}, req, false));
       }
@@ -41,12 +43,59 @@ module.exports = {
         );
       }
 
+
       if (!pickupLocation?.coordinates || !dropLocation?.coordinates) {
         return res.json(responseData("LOCATIONS_REQUIRED", {}, req, false));
       }
 
       if (!vehicleType) {
         return res.json(responseData("VEHICLE_TYPE_REQUIRED", {}, req, false));
+      }
+
+      if(promoCode){
+       
+           const promo = await promoCodeModel.findOne({ code:promoCode, isActive: true });
+
+      if (!promo) {
+        return res.json(responseData("INVALID_PROMO_CODE", {}, req, false));
+      }
+
+      if (promo.expiryDate < new Date()) {
+        return res.json(responseData("PROMO_CODE_EXPIRED", {}, req, false));
+      }
+      // console.log(promo.usageLimit, promo.usedCount,"usage")
+
+  if (promo.usageLimit > 0 && promo.usedCount >= promo.usageLimit) {
+     return res.json(responseData("PROMO_CODE_USAGE_LIMIT_EXCEEDED", {}, req, false));
+ 
+    
+  }
+// console.log(existingRide.rider)
+  // Per-user usage limit
+  const userUsageCount = await Ride.countDocuments({
+    rider: existingRide.rider,
+    promoCode: promo.code,
+     status: {
+    $in: [
+      "accepted",
+      "arrived",
+      "ongoing",
+      "reachedDestination",
+      "completed"
+    ]
+  }
+  });
+// console.log(promo.perUserLimit,userUsageCount,"usage2")
+  if (promo.perUserLimit > 0 && userUsageCount >= promo.perUserLimit) {
+    
+      return res.json(responseData("PROMO_CODE_PER_USER_LIMIT_EXCEEDED", {}, req, false));
+    // return { isValid: false, message: "PROMO_CODE_PER_USER_LIMIT_EXCEEDED" };
+  }
+
+// await promoCodeModel.updateOne(
+//     { _id: promo._id },
+//     { $inc: { usedCount: 1 },
+//     } );
       }
 
       const [pickupLng, pickupLat] = pickupLocation.coordinates;
@@ -228,13 +277,13 @@ module.exports = {
   applyPromo: async (req, res) => {
     try {
       const { code, userId, rideId } = req.body;
-
+// console.log(req.body)
       if (!code) {
         return res.json(responseData("PROMO_CODE_REQUIRED", {}, req, false));
       }
 
       const promo = await promoCodeModel.findOne({ code, isActive: true });
-
+// console.log(promo,"promo")
       if (!promo) {
         return res.json(responseData("INVALID_PROMO_CODE", {}, req, false));
       }
@@ -242,17 +291,37 @@ module.exports = {
       if (promo.expiryDate < new Date()) {
         return res.json(responseData("PROMO_CODE_EXPIRED", {}, req, false));
       }
+      console.log(promo.usageLimit, promo.usedCount,"usage")
 
-      // Check per-user usage limit
-      const usedBefore = promo.usageHistory.filter(
-        (e) => e.userId?.toString() === userId
-      ).length;
+  if (promo.usageLimit > 0 && promo.usedCount >= promo.usageLimit) {
+     return res.json(responseData("PROMO_CODE_USAGE_LIMIT_EXCEEDED", {}, req, false));
+    // return { isValid: false, message: "PROMO_CODE_USAGE_LIMIT_EXCEEDED" };
+    
+  }
 
-      if (usedBefore >= promo.perUserLimit) {
-        return res.json(responseData("PROMO_CODE_ALREADY_USED", {}, req, false));
-      }
+  // Per-user usage limit
+  const userUsageCount = await Ride.countDocuments({
+    rider: userId,
+    promoCode: promo.code,
+      status: {
+    $in: [
+      "accepted",
+      "arrived",
+      "ongoing",
+      "reachedDestination",
+      "completed"
+    ]
+  }
+  });
+// console.log(promo.perUserLimit,userUsageCount,"usage")
+  if (promo.perUserLimit > 0 && userUsageCount >= promo.perUserLimit) {
+    
+      return res.json(responseData("PROMO_CODE_PER_USER_LIMIT_EXCEEDED", {}, req, false));
+    // return { isValid: false, message: "PROMO_CODE_PER_USER_LIMIT_EXCEEDED" };
+  }
 
-      // Return discount information
+
+
       const discountInfo = {
         discountType: promo.discountType,
         discountValue: promo.discountValue,

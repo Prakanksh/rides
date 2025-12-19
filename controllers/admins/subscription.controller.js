@@ -40,5 +40,20 @@ module.exports = {
       const msg = err.message || 'SOMETHING_WENT_WRONG'
       return res.status(422).json(responseData(msg, {}, req))
     }
-  }
+  },
+  deleteSubscription: async (req, res) => {
+    try {
+      await service.deleteSubscription(req, res)
+    } catch (err) {
+      const msg = err.message || 'SOMETHING_WENT_WRONG'
+      return res.status(422).json(responseData(msg, {}, req))
+    }
+},
+ updateSubscriptionPayment : async (req, res) => {
+  try {
+    await service.updateSubscriptionPayment(req, res)
+  } catch (err) {
+    const msg = err.message || 'SOMETHING_WENT_WRONG'
+    return res.status(422).json(responseData(msg, {}, req))
+  }}
 }

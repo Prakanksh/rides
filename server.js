@@ -31,6 +31,7 @@ db.initialize();
 const crons = require('./helpers/cron');
 crons.cashSettlement();
 crons.walletSettlement();
+crons.estimateRidesDelete()
 crons.scheduledRidesActivation();
 crons.autoCancelRides();
 

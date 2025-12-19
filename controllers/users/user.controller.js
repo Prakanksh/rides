@@ -330,5 +330,21 @@ module.exports = {
       const msg = err.message || 'SOMETHING_WENT_WRONG'
       return res.status(422).json(responseData(msg, {}, req))
     }
-  }
+  },
+   subcriptions :async (req, res) => {
+ try {
+      await userService.subscriptionList(req, res)
+    } catch (err) {
+      const msg = err.message || 'SOMETHING_WENT_WRONG'
+      return res.status(422).json(responseData(msg, {}, req))
+    }
+  },
+  buySubscription: async (req, res) => {
+    try {
+      await userService.buySubscription(req, res)
+    } catch (err) {
+      const msg = err.message || 'SOMETHING_WENT_WRONG'
+      return res.status(422).json(responseData(msg, {}, req))
+    }}
+   
 }

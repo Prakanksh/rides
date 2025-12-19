@@ -25,6 +25,7 @@ const supportModel = require('../../models/support.model')
 const { getSupportInquires, createPromoCode } = require('../../controllers/admins/admin.controller')
 const promoCodeModel = require('../../models/promoCode.model')
 const adminSettingModel = require('../../models/adminSetting.model')
+// const subscriptionModel = require('../../models/subscription.model')
 
 module.exports = {
   adminLogin: async (req, res) => {
@@ -428,7 +429,7 @@ createPromoCode: async (req, res) => {
       );
     }
 
-    // Check if promo code exists
+ 
     const existingPromo = await promoCodeModel.findOne({ code });
     if (existingPromo) {
       return res.json(responseData('PROMO_CODE_EXISTS', {}, req, false));
@@ -442,7 +443,8 @@ createPromoCode: async (req, res) => {
     const msg = err.message || 'SOMETHING_WENT_WRONG';
     return res.status(422).json(responseData(msg, {}, req));
   }
-}
+},
+
 
 }
 

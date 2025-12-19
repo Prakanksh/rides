@@ -59,7 +59,8 @@ const TransactionSchema = new mongoose.Schema(
         "wallet_withdrawal",
         "refund",
         "penalty",
-        "bonus"
+        "bonus",
+        "subscription_payment"
       ],
       required: false
     },
