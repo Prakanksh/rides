@@ -128,10 +128,10 @@ updateSupportStatus : async (req, res) => {
 
 createOrUpdateSettings : async (req, res) => {
   try {
-    const { commissionPercentage, cancellationFee, minimumFare } = req.body;
+    const { commissionPercentage, cancellationFee, minimumFare ,driverCancelationFee} = req.body;
 
     // Basic validation
-    if (!commissionPercentage || !cancellationFee || !minimumFare) {
+    if (!commissionPercentage || !cancellationFee || !minimumFare || !driverCancelationFee) {
       return res.status(400).json({
         success: false,
         message: "All fields are required: commissionPercentage, cancellationFee, minimumFare"
@@ -139,7 +139,7 @@ createOrUpdateSettings : async (req, res) => {
     }
 
     // Numeric validation
-    if (isNaN(commissionPercentage) || isNaN(cancellationFee) || isNaN(minimumFare)) {
+    if (isNaN(commissionPercentage) || isNaN(cancellationFee) || isNaN(minimumFare) || isNaN(driverCancelationFee)) {
       return res.status(400).json({
         success: false,
         message: "All fields must be numbers"
@@ -176,7 +176,7 @@ createOrUpdateSettings : async (req, res) => {
       settings.commissionPercentage = commissionPercentage;
       settings.cancellationFee = cancellationFee;
       settings.minimumFare = minimumFare;
-      
+      settings.driverCancelationFee = driverCancelationFee;
       await settings.save();
       
       return res.status(200).json({

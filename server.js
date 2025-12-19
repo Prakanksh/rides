@@ -34,7 +34,7 @@ crons.walletSettlement();
 crons.estimateRidesDelete()
 crons.scheduledRidesActivation();
 crons.autoCancelRides();
-
+crons.penalitySettlement();
 const corsOption = {
   methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
   exposedHeaders: ['x-access-token']
