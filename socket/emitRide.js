@@ -1,6 +1,8 @@
 const Ride = require("../models/ride.model");
 const Driver = require("../models/driver.model");
 const Vehicle = require("../models/vehicle.model");
+const User = require("../models/user.model");
+const AdminSetting = require("../models/adminSetting.model");
 const { ensureWallets, payByWallet, payByCash, confirmCashPayment, resolveRideFare } = require("../helpers/walletUtil");
 let ioInstance = null;
 
@@ -401,8 +403,33 @@ function initSocketIO(io) {
         }
 
         if (ride.status === "ongoing" || ride.status === "reachedDestination") {
-          socket.emit("ride:cancel:response", { success: false, message: "CANNOT_CANCEL_RIDE_IN_PROGRESS" }); 
+          socket.emit("ride:cancel:response", { success: false, message: "CANNOT_CANCEL_RIDE_IN_PROGRESS" });
           return;
+        }
+
+        // Calculate and apply cancellation penalty if ride was accepted
+        const wasAccepted = ride.status === "accepted" && ride.driver;
+        if (wasAccepted) {
+          try {
+            const settings = await AdminSetting.findOne({});
+            const cancellationPercentage = settings?.userCancellationPercentage || 10;
+            const rideFare = resolveRideFare(ride, 0);
+            
+            if (rideFare > 0 && cancellationPercentage > 0) {
+              const penaltyAmount = Number(((rideFare * cancellationPercentage) / 100).toFixed(2));
+              
+              if (penaltyAmount > 0) {
+                const user = await User.findById(userId);
+                if (user) {
+                  const currentPenalty = Number((user.cancellationPenalty || 0).toFixed(2));
+                  user.cancellationPenalty = Number((currentPenalty + penaltyAmount).toFixed(2));
+                  await user.save();
+                }
+              }
+            }
+          } catch (error) {
+            console.error("Error calculating cancellation penalty:", error);
+          }
         }
 
         ride.status = "cancelled";

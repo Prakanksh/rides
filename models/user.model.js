@@ -158,6 +158,10 @@ const userSchema = new mongoose.Schema(
     wallet: {
       type: Number,
       default: 0
+    },
+    cancellationPenalty: {
+      type: Number,
+      default: 0
     }
   },
   {
@@ -171,6 +175,10 @@ userSchema.pre('save', function (next) {
   // Round wallet to 2 decimal places
   if (this.wallet !== undefined && this.wallet !== null) {
     this.wallet = Number(this.wallet.toFixed(2));
+  }
+  // Round cancellationPenalty to 2 decimal places
+  if (this.cancellationPenalty !== undefined && this.cancellationPenalty !== null) {
+    this.cancellationPenalty = Number(this.cancellationPenalty.toFixed(2));
   }
   
   // Only set userId for new documents

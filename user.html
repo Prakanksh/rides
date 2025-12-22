@@ -38,6 +38,11 @@
 
     <div class="row">
       <button onclick="emitPaidPayment()">user:paidPayment (cash only)</button>
+      <button onclick="cancelRide()" style="background-color: #ff4444; color: white;">Cancel Ride (Socket)</button>
+      <input id="cancelReason" placeholder="Cancellation reason (optional)" />
+    </div>
+
+    <div class="row">
       <button onclick="clearLog()">Clear log</button>
     </div>
 
@@ -126,7 +131,20 @@ function connectUser() {
     logJson("", data);
   });
 
+  // RIDE CANCELLED
+  socket.on("user:rideCancelled", (data) => {
+    log("❌ Ride Cancelled:");
+    logJson("", data);
+  });
+
+  // SEARCHING FOR NEW DRIVER
+  socket.on("user:searchingDriver", (data) => {
+    log("🔍 Searching for new driver:");
+    logJson("", data);
+  });
+
   socket.on("user:paidPayment:response", (d) => logJson("✅ user:paidPayment:response", d));
+  socket.on("ride:cancel:response", (d) => logJson("✅ ride:cancel:response", d));
   socket.on("disconnect", () => log("❌ Socket disconnected"));
   socket.on("connect_error", (error) => log("❌ Connection error: " + error.message));
 }
@@ -149,6 +167,25 @@ function emitPaidPayment() {
   }
   logJson("📤 user:paidPayment", { rideId, userId });
   socket.emit("user:paidPayment", { rideId, userId });
+}
+
+function cancelRide() {
+  const userId = document.getElementById("userId").value;
+  const rideId = document.getElementById("rideId").value;
+  const reason = document.getElementById("cancelReason").value || "Cancelled by user";
+  
+  if (!socket || !socket.connected) {
+    log("❌ Socket not connected. Please click 'Connect' first.");
+    return;
+  }
+  
+  if (!rideId) {
+    log("❌ Please enter rideId");
+    return;
+  }
+  
+  logJson("📤 ride:cancel:user", { rideId, userId, reason });
+  socket.emit("ride:cancel:user", { rideId, userId, reason });
 }
 </script>
 </body>

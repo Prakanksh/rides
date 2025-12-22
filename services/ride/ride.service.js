@@ -1,6 +1,8 @@
 const Ride = require("../../models/ride.model");
 const Driver = require("../../models/driver.model");
 const Vehicle = require("../../models/vehicle.model");
+const User = require("../../models/user.model");
+const AdminSetting = require("../../models/adminSetting.model");
 const { responseData } = require("../../helpers/responseData");
 const { calculateDistanceInKm } = require("../../helpers/distance");
 const { calculateFare, calculateAllVehicleFares } = require("../../helpers/fareConfig");
@@ -144,6 +146,14 @@ module.exports = {
         }
       }
 
+      // Apply cancellation penalty if user has pending penalty
+      let penaltyAmount = 0;
+      const user = await User.findById(riderId);
+      if (user && user.cancellationPenalty > 0) {
+        penaltyAmount = Number((user.cancellationPenalty || 0).toFixed(2));
+        finalFare = Number((finalFare + penaltyAmount).toFixed(2));
+      }
+
       // Update ride with vehicle selection and other details
       const ride = await Ride.findByIdAndUpdate(
         rideId,
@@ -155,6 +165,7 @@ module.exports = {
           finalFare: finalFare,
           originalFare: originalFare,
           discountAmount: discountAmount,
+          cancellationPenalty: penaltyAmount,
           vehicleType: normalizedVehicleType,
           paymentMethod: paymentMethod || "cash",
           status: "requested",
@@ -168,13 +179,13 @@ module.exports = {
         return res.json(responseData("RIDE_UPDATE_FAILED", {}, req, false));
       }
 
-      // Find drivers with matching vehicle type
+      // Find vehicles with matching vehicle type
       const vehiclesWithMatchingType = await Vehicle.find({
         type: normalizedVehicleType,
         status: "active"
       }).select("driver").lean();
       
-      const driverIdsWithMatchingVehicle = vehiclesWithMatchingType.map(v => v.driver);
+      const driverIdsWithMatchingVehicle = vehiclesWithMatchingType.map(v => v.driver).filter(id => id != null);
       
       if (driverIdsWithMatchingVehicle.length === 0) {
         return res.json(
@@ -187,7 +198,7 @@ module.exports = {
         );
       }
 
-      // Find nearby available drivers
+      // Find nearby available drivers (only those that actually exist)
       const nearbyDrivers = await Driver.find({
         _id: { $in: driverIdsWithMatchingVehicle },
         isAvailable: true,
@@ -562,6 +573,14 @@ module.exports = {
         }
       }
 
+      // Apply cancellation penalty if user has pending penalty
+      let penaltyAmount = 0;
+      const userForSchedule = await User.findById(riderId);
+      if (userForSchedule && userForSchedule.cancellationPenalty > 0) {
+        penaltyAmount = Number((userForSchedule.cancellationPenalty || 0).toFixed(2));
+        finalFare = Number((finalFare + penaltyAmount).toFixed(2));
+      }
+
       const ride = await Ride.findByIdAndUpdate(
         rideId,
         {
@@ -570,6 +589,7 @@ module.exports = {
           finalFare: finalFare,
           originalFare: originalFare,
           discountAmount: discountAmount,
+          cancellationPenalty: penaltyAmount,
           vehicleType: normalizedVehicleType,
           paymentMethod: paymentMethod || "cash",
           status: "scheduled",
@@ -688,6 +708,31 @@ module.exports = {
 
     if (ride.status === "ongoing" || ride.status === "reachedDestination") {
       return res.json(responseData("CANNOT_CANCEL_RIDE_IN_PROGRESS", {}, req, false));
+    }
+
+    // Calculate and apply cancellation penalty if ride was accepted (before changing status)
+    const wasAccepted = ride.status === "accepted" && ride.driver;
+    if (wasAccepted) {
+      try {
+        const settings = await AdminSetting.findOne({});
+        const cancellationPercentage = settings?.userCancellationPercentage || 10;
+        const rideFare = resolveRideFare(ride, 0);
+        
+        if (rideFare > 0 && cancellationPercentage > 0) {
+          const penaltyAmount = Number(((rideFare * cancellationPercentage) / 100).toFixed(2));
+          
+          if (penaltyAmount > 0) {
+            const user = await User.findById(riderId);
+            if (user) {
+              const currentPenalty = Number((user.cancellationPenalty || 0).toFixed(2));
+              user.cancellationPenalty = Number((currentPenalty + penaltyAmount).toFixed(2));
+              await user.save();
+            }
+          }
+        }
+      } catch (error) {
+        console.error("Error calculating cancellation penalty:", error);
+      }
     }
 
     ride.status = "cancelled";

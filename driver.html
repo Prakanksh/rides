@@ -51,6 +51,11 @@
     </div>
 
     <div class="row">
+      <button onclick="cancelRide()" style="background-color: #ff4444; color: white;">Cancel Ride (Socket)</button>
+      <input id="cancelReason" placeholder="Cancellation reason (optional)" />
+    </div>
+
+    <div class="row">
       <button onclick="sendLocation()">driver:location (random)</button>
       <button onclick="clearLog()">Clear log</button>
     </div>
@@ -129,10 +134,12 @@ function connectDriver() {
   socket.on("ride:start:response", (d) => logJson("✅ ride:start:response", d));
   socket.on("ride:reachedDestination:response", (d) => logJson("✅ ride:reachedDestination:response", d));
   socket.on("driver:receivedPayment:response", (d) => logJson("✅ driver:receivedPayment:response", d));
+  socket.on("ride:cancel:response", (d) => logJson("✅ ride:cancel:response", d));
 
   // server-to-driver notifications
   socket.on("driver:rideCompleted", (d) => logJson("🏁 driver:rideCompleted", d));
   socket.on("driver:paymentReceived", (d) => logJson("💵 driver:paymentReceived", d));
+  socket.on("driver:rideCancelled", (d) => logJson("❌ driver:rideCancelled", d));
   
   socket.on("disconnect", () => {
     log("❌ Socket disconnected");
@@ -206,6 +213,25 @@ function receivedPayment() {
   const rideId = document.getElementById("rideId").value;
   logJson("📤 driver:receivedPayment", { rideId, driverId });
   socket.emit("driver:receivedPayment", { rideId, driverId });
+}
+
+function cancelRide() {
+  const driverId = document.getElementById("driverId").value;
+  const rideId = document.getElementById("rideId").value;
+  const reason = document.getElementById("cancelReason").value || "Cancelled by driver";
+  
+  if (!socket || !socket.connected) {
+    log("❌ Socket not connected. Please click 'Connect Driver' first.");
+    return;
+  }
+  
+  if (!rideId) {
+    log("❌ Please enter rideId");
+    return;
+  }
+  
+  logJson("📤 ride:cancel:driver", { rideId, driverId, reason });
+  socket.emit("ride:cancel:driver", { rideId, driverId, reason });
 }
 </script>
 </body>

@@ -1,11 +1,5 @@
 const promoCodeModel = require("../models/promoCode.model");
 
-/**
- * Calculate discount amount from promo code
- * @param {String} promoCode - Promo code string
- * @param {Number} originalFare - Original fare before discount
- * @returns {Object} - { discountAmount, isValid }
- */
 async function calculateDiscount(promoCode, originalFare) {
   if (!promoCode || !originalFare || originalFare <= 0) {
     return { discountAmount: 0, isValid: false };
@@ -45,14 +39,6 @@ async function calculateDiscount(promoCode, originalFare) {
   }
 }
 
-/**
- * Update promo code usage when a ride completes
- * Atomically increments usedCount and adds to usageHistory
- * Note: Updates even if promo is later deactivated (usage happened when it was active)
- * @param {String} promoCode - Promo code string
- * @param {String|ObjectId} userId - User ID who used the promo
- * @returns {Promise<Boolean>} - true if updated, false if not found/invalid
- */
 async function updatePromoCodeUsage(promoCode, userId) {
   if (!promoCode || !userId) {
     return false;
