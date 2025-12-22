@@ -9,6 +9,7 @@ const rideModel = require("../models/ride.model");
 const { activateScheduledRides } = require("../services/cron/scheduledRides.cron");
 const { autoCancelRides } = require("../services/cron/autoCancelRides.cron");
 const { penalitySettlementCron } = require("../services/cron/penalitySettlement.cron");
+const { recoverDriverAvailability } = require("../services/cron/recoverDriverAvailability.cron");
 // const { cashSettlementSchedule, walletSettlementSchedule } = require("../configs/cron.config");
 
 let crons = {
@@ -73,6 +74,13 @@ job.start();
             await penalitySettlementCron();
         })
         job.start();
-}
+    },
+    recoverDriverAvailability: async () => {
+        console.log("🔧 Driver availability recovery cron: Every 5 minutes");
+        let job = cron.schedule("*/5 * * * *", async () => {
+            await recoverDriverAvailability();
+        });
+        job.start();
+    }
 }
 module.exports = crons;
