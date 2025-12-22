@@ -76,14 +76,19 @@ async function autoCancelRides() {
     }
 
     for (const ride of stuckRides) {
+      const driverId = ride.driver?.toString();
       await Ride.findByIdAndUpdate(ride._id, {
         status: "cancelled",
         cancelledBy: "system",
         cancelledAt: now,
         cancellationReason: "Ride timeout",
         autoCancelled: true,
-        driver: null
+        driver: null,
+        otpForRideStart: null
       });
+      if (driverId) {
+        await Driver.findByIdAndUpdate(driverId, { isAvailable: true });
+      }
       const riderId = ride.rider?.toString() || ride.rider;
       if (riderId) {
         const user = await User.findById(riderId);
