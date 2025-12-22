@@ -12,7 +12,8 @@ const Admin = require('./models/admin.model');
 const createAdmin = async () => {
   try {
     // Connect to MongoDB
-    const mongoURI = `mongodb+srv://nagpalprakankshabvpy_db_user:qwertyuiop@cluster0.n7rle9y.mongodb.net/rides?retryWrites=true&w=majority`;
+    const mongoURI = `mongodb+srv://nagpalprakankshabvpy_db_user:qwertyuiop@cluster0.n7rle9y.mongodb.net/?appName=Cluster0`
+    // const mongoURI = `mongodb+srv://nagpalprakankshabvpy_db_user:qwertyuiop@cluster0.n7rle9y.mongodb.net/rides?retryWrites=true&w=majority`;
     
     await mongoose.connect(mongoURI);
     console.log('✅ Connected to MongoDB');

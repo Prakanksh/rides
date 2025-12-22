@@ -68,7 +68,7 @@ job.start();
     },
     penalitySettlement: async () => {
         console.log("⚖️ Penality settlement cron: Every day at midnight");
-        let job = cron.schedule("*/1 * * * *", async () => {
+        let job = cron.schedule("0 0 * * *", async () => {
             console.log("Penality Settlement Cron Running");
             await penalitySettlementCron();
         })
