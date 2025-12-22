@@ -424,14 +424,19 @@ module.exports = {
     if (!riderId) return res.json(responseData("NOT_AUTHORIZED", {}, req, false));
     if (!rideId) return res.json(responseData("RIDE_ID_REQUIRED", {}, req, false));
 
-    const ride = await Ride.findOne({ _id: rideId, rider: riderId });
-    if (!ride) return res.json(responseData("INVALID_RIDE", {}, req, false));
-    if (ride.paymentMethod !== "cash" || ride.status !== "reachedDestination") {
-      return res.json(responseData("INVALID_RIDE_STATE", {}, req, false));
-    }
-
-    ride.cashPaidByUser = true;
-    await ride.save();
+    const ride = await Ride.findOneAndUpdate(
+      { 
+        _id: rideId, 
+        rider: riderId,
+        paymentMethod: "cash",
+        status: "reachedDestination",
+        paidToDriver: { $ne: true }
+      },
+      { $set: { cashPaidByUser: true } },
+      { new: true }
+    );
+    
+    if (!ride) return res.json(responseData("INVALID_RIDE_STATE", {}, req, false));
     return res.json(responseData("PAYMENT_MARKED", { rideId: ride._id }, req, true));
   },
 

@@ -211,18 +211,26 @@ module.exports = {
     try {
       const ride = await Ride.findOne({
         _id: req.body.rideId,
-        driver: req.user._id
+        driver: req.user._id,
+        status: "reachedDestination",
+        paymentMethod: "cash",
+        cashPaidByUser: true,
+        paidToDriver: { $ne: true }
       });
 
-      if (!ride) return res.json(responseData("INVALID_RIDE", {}, req, false));
-      if (ride.status !== "reachedDestination" || ride.paymentMethod !== "cash") {
+      if (!ride) {
+      const checkRide = await Ride.findById(req.body.rideId);
+      if (!checkRide) return res.json(responseData("INVALID_RIDE", {}, req, false));
+      if (checkRide.status !== "reachedDestination" || checkRide.paymentMethod !== "cash") {
         return res.json(responseData("INVALID_RIDE_STATE", {}, req, false));
       }
-      if (!ride.cashPaidByUser) {
+      if (!checkRide.cashPaidByUser) {
         return res.json(responseData("USER_PAYMENT_NOT_CONFIRMED", {}, req, false));
       }
-      if (ride.paidToDriver) {
+      if (checkRide.paidToDriver) {
         return res.json(responseData("PAYMENT_ALREADY_CONFIRMED", {}, req, false));
+        }
+        return res.json(responseData("INVALID_RIDE_STATE", {}, req, false));
       }
 
       const finalFare = resolveRideFare(ride, 0);
