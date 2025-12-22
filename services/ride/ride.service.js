@@ -19,7 +19,7 @@ module.exports = {
     try {
       const { pickupLocation, dropLocation, vehicleType, paymentMethod, promoCode } = req.body;
       const { rideId } = req.params;
-      console.log(req.body)
+    
 
       const riderId = req.user?._id;
       if (!riderId) {
@@ -85,7 +85,7 @@ module.exports = {
     ]
   }
   });
-// console.log(promo.perUserLimit,userUsageCount,"usage2")
+
   if (promo.perUserLimit > 0 && userUsageCount >= promo.perUserLimit) {
     
       return res.json(responseData("PROMO_CODE_PER_USER_LIMIT_EXCEEDED", {}, req, false));
@@ -146,6 +146,7 @@ module.exports = {
         }
       }
 
+
       // Apply cancellation penalty if user has pending penalty
       let penaltyAmount = 0;
       const user = await User.findById(riderId);
@@ -184,9 +185,9 @@ module.exports = {
         type: normalizedVehicleType,
         status: "active"
       }).select("driver").lean();
-      
+     
       const driverIdsWithMatchingVehicle = vehiclesWithMatchingType.map(v => v.driver).filter(id => id != null);
-      
+   
       if (driverIdsWithMatchingVehicle.length === 0) {
         return res.json(
           responseData(
@@ -199,6 +200,7 @@ module.exports = {
       }
 
       // Find nearby available drivers (only those that actually exist)
+   
       const nearbyDrivers = await Driver.find({
         _id: { $in: driverIdsWithMatchingVehicle },
         isAvailable: true,
@@ -213,8 +215,9 @@ module.exports = {
             $maxDistance: 5000
           }
         }
-      }).select("_id firstName lastName");
-      
+      })
+      // .select("_id firstName lastName");
+     
       // Send ride to all nearby drivers
       if (nearbyDrivers.length > 0) {
         nearbyDrivers.forEach(driver => {

@@ -578,6 +578,7 @@ function initSocketIO(io) {
 }
 
 function sendRideToDriver(driverId, rideData) {
+  console.log(driverId,rideData,"sendRideToDriver")
   if (!ioInstance) { console.log("❌ ioInstance not initialized"); return false; }
   try {
     const socketId = getDriverSocketId(driverId);
@@ -593,6 +594,7 @@ function sendRideToDriver(driverId, rideData) {
 }
 
 function sendToUser(userId, eventName, data) {
+  console.log(userId,eventName,data,"sendToUser")
   if (!ioInstance) return false;
   try {
     const socketId = getUserSocketId(userId);
