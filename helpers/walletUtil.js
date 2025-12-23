@@ -3,6 +3,7 @@ const Driver = require("../models/driver.model");
 const Admin = require("../models/admin.model");
 const Transaction = require("../models/transactions.model");
 const AdminSetting = require("../models/adminSetting.model");
+const Ride = require("../models/ride.model");
 const { calculateActualTime } = require("./etaCalculator");
 const { updatePromoCodeUsage } = require("./promoUtil");
 
@@ -74,6 +75,7 @@ async function ensureWallets(userId, driverId) {
 }
 
 async function payByWallet(ride, userId, driverId, finalFare) {
+try {
   const user = await User.findById(userId);
   const admin = await Admin.findOne({});
 
@@ -98,8 +100,6 @@ async function payByWallet(ride, userId, driverId, finalFare) {
   user.wallet = Number((userWalletBalance - roundedFinalFare).toFixed(2));
   await user.save();
 
-  // For wallet rides: user payment goes to admin.commission now; nightly cron settles to driver/admin wallets.
-  // Shares are computed from the original fare; promo discount reduces admin share only.
   const { adminCut, driverShare } = await computeShares(roundedOriginalFare);
   const roundedAdminCut = Number(adminCut.toFixed(2));
   const roundedDriverShare = Number(driverShare.toFixed(2));
@@ -131,7 +131,7 @@ async function payByWallet(ride, userId, driverId, finalFare) {
   }
 
   ride.paidToAdmin = true;
-  ride.paidToDriver = false; // set by nightly wallet settlement cron
+  ride.paidToDriver = false;
   ride.transactionId = userToAdminTx._id;
   if (!ride.paymentDetails) ride.paymentDetails = {};
   ride.paymentDetails.userPaidAmount = roundedFinalFare;
@@ -167,13 +167,21 @@ async function payByWallet(ride, userId, driverId, finalFare) {
     await updatePromoCodeUsage(ride.promoCode, userId);
   }
 
-  // driver availability is handled on ride completion, not settlement
   if (driverId) await Driver.findByIdAndUpdate(driverId, { isAvailable: true });
 
-  return { success: true, transactionId: userToAdminTx._id, rideCompleted: true };
+    return { success: true, transactionId: userToAdminTx._id, rideCompleted: true };
+  } finally {
+    if (driverId) {
+      const currentRide = await Ride.findById(ride._id);
+      if (!currentRide || currentRide.status !== "completed") {
+        await Driver.findByIdAndUpdate(driverId, { isAvailable: true });
+      }
+    }
+  }
 }
 
 async function payByCash(ride, userId, driverId, finalFare) {
+try {
   const driver = await Driver.findById(driverId);
   if (!driver) {
     return { success: false, message: "DRIVER_NOT_FOUND" };
@@ -184,22 +192,17 @@ async function payByCash(ride, userId, driverId, finalFare) {
     return { success: false, message: "INVALID_FARE_AMOUNT" };
   }
 
-  // Use originalFare if available (for promo discount calculation), otherwise use finalFare
   const originalFare = ride.originalFare > 0 ? ride.originalFare : fareToUse;
   const discountAmount = ride.discountAmount || 0;
   const roundedFinalFare = Number(fareToUse.toFixed(2));
   const roundedOriginalFare = Number(originalFare.toFixed(2));
   const roundedDiscountAmount = Number(discountAmount.toFixed(2));
 
-  // Calculate shares from original fare (before discount)
   const { adminCut, driverShare } = await computeShares(roundedOriginalFare);
   const roundedAdminCut = Number(adminCut.toFixed(2));
   const roundedDriverShare = Number(driverShare.toFixed(2));
-  
-  // Deduct discount from admin share
   const finalAdminShare = Math.max(0, Number((roundedAdminCut - roundedDiscountAmount).toFixed(2)));
 
-  // Driver receives full share from original fare (not discounted)
   const currentDriverCommission = Number((driver.driverCommission || 0).toFixed(2));
   const newDriverCommission = Number((currentDriverCommission + roundedDriverShare).toFixed(2));
   driver.driverCommission = newDriverCommission;
@@ -261,7 +264,6 @@ async function payByCash(ride, userId, driverId, finalFare) {
   
   await ride.save();
 
-  // Clear cancellation penalty after payment
   if (ride.cancellationPenalty > 0) {
     const user = await User.findById(userId);
     if (user && user.cancellationPenalty > 0) {
@@ -281,9 +283,18 @@ async function payByCash(ride, userId, driverId, finalFare) {
   }
 
   return { success: true, transactionId: userToDriverTx._id, rideCompleted: true };
+} finally {
+  if (driverId) {
+    const currentRide = await Ride.findById(ride._id);
+    if (!currentRide || currentRide.status !== "completed") {
+      await Driver.findByIdAndUpdate(driverId, { isAvailable: true });
+    }
+  }
+}
 }
 
 async function confirmCashPayment(ride, userId, driverId, finalFare) {
+try {
   const driver = await Driver.findById(driverId);
   if (!driver) {
     return { success: false, message: "DRIVER_NOT_FOUND" };
@@ -365,7 +376,6 @@ async function confirmCashPayment(ride, userId, driverId, finalFare) {
   
   await ride.save();
 
-  // Clear cancellation penalty after payment
   if (ride.cancellationPenalty > 0) {
     const user = await User.findById(userId);
     if (user && user.cancellationPenalty > 0) {
@@ -385,6 +395,14 @@ async function confirmCashPayment(ride, userId, driverId, finalFare) {
   }
 
   return { success: true, transactionId: userToDriverTx._id, rideCompleted: true };
+} finally {
+  if (driverId) {
+    const currentRide = await Ride.findById(ride._id);
+    if (!currentRide || currentRide.status !== "completed") {
+      await Driver.findByIdAndUpdate(driverId, { isAvailable: true });
+    }
+  }
+}
 }
 
 async function driverSettlement(driverId, rideIds, paymentMethod, paymentDetails) {

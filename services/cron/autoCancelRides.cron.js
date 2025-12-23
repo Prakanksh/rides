@@ -6,6 +6,7 @@ const { sendToUser } = require("../../socket/emitRide");
 const _ = require("lodash");
 
 const AUTO_CANCEL_TIMEOUT_MINUTES = 15;
+const Driver = require("../../models/driver.model");
 
 async function sendNotificationAndroidIosUser(receiverUser, title, description) {
   await Notification.create({
@@ -59,6 +60,42 @@ async function autoCancelRides() {
     const now = new Date();
     const timeoutThreshold = new Date(now.getTime() - AUTO_CANCEL_TIMEOUT_MINUTES * 60 * 1000);
 
+    const stuckRides = await Ride.find({
+      driver: { $ne: null },
+      $or: [
+        { status: "accepted", updatedAt: { $lte: new Date(now.getTime() - 30 * 60 * 1000) } },
+        { status: "arrived", updatedAt: { $lte: new Date(now.getTime() - 60 * 60 * 1000) } },
+        { status: "ongoing", updatedAt: { $lte: new Date(now.getTime() - 120 * 60 * 1000) } },
+        { status: "reachedDestination", updatedAt: { $lte: new Date(now.getTime() - 60 * 60 * 1000) } }
+      ]
+    }).select("_id rider driver").lean();
+
+    const driverIds = [...new Set(stuckRides.map(r => r.driver?.toString()).filter(Boolean))];
+    if (driverIds.length > 0) {
+      await Driver.updateMany({ _id: { $in: driverIds } }, { $set: { isAvailable: true } });
+    }
+
+    for (const ride of stuckRides) {
+      await Ride.findByIdAndUpdate(ride._id, {
+        status: "cancelled",
+        cancelledBy: "system",
+        cancelledAt: now,
+        cancellationReason: "Ride timeout",
+        autoCancelled: true,
+        driver: null
+      });
+      const riderId = ride.rider?.toString() || ride.rider;
+      if (riderId) {
+        const user = await User.findById(riderId);
+        if (user) await sendNotificationAndroidIosUser(user, "Ride Cancelled", "Your ride has been cancelled due to timeout.");
+        const cancelledRide = await Ride.findById(ride._id);
+        if (cancelledRide) {
+          sendToUser(riderId, "user:rideCancelled", { ride: cancelledRide, cancelledBy: "system", message: "Your ride has been cancelled due to timeout." });
+        }
+      }
+    }
+
+    // Cancel rides that have been waiting for a driver for too long
     const normalRidesQuery = {
       isScheduled: false,
       status: "requested",
