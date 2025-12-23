@@ -449,12 +449,14 @@ function initSocketIO(io) {
         ride.cancellationReason = reason || "Cancelled by user";
         ride.cancelledBy = "user";
         ride.cancelledAt = new Date();
+        ride.otpForRideStart = null;
+        const driverId = ride.driver;
+        ride.driver = null;
         await ride.save();
 
-        // Set driver as available when ride is cancelled
-        if (ride.driver) {
-          await Driver.findByIdAndUpdate(ride.driver, { isAvailable: true });
-          const driverSocket = getDriverSocketId(ride.driver);
+        if (driverId) {
+          await Driver.findByIdAndUpdate(driverId, { isAvailable: true });
+          const driverSocket = getDriverSocketId(driverId);
           if (driverSocket && ioInstance) {
             ioInstance.to(driverSocket).emit("driver:rideCancelled", { ride, cancelledBy: "user" });
           }

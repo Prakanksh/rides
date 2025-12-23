@@ -747,17 +747,20 @@ module.exports = {
     ride.cancellationReason = reason || "Cancelled by user";
     ride.cancelledBy = "user";
     ride.cancelledAt = new Date();
+    ride.otpForRideStart = null;
+    const driverId = ride.driver;
+    ride.driver = null;
     await ride.save();
 
-    if (ride.driver) {
-      await Driver.findByIdAndUpdate(ride.driver, { isAvailable: true });
+    if (driverId) {
+      await Driver.findByIdAndUpdate(driverId, { isAvailable: true });
       const ioInstance = _getIo();
       if (ioInstance) {
-        const driverSocket = getDriverSocketId(ride.driver.toString());
+        const driverSocket = getDriverSocketId(driverId.toString());
         if (driverSocket) {
           ioInstance.to(driverSocket).emit("driver:rideCancelled", { ride, cancelledBy: "user" });
         } else {
-          ioInstance.to(`driver:${ride.driver}`).emit("driver:rideCancelled", { ride, cancelledBy: "user" });
+          ioInstance.to(`driver:${driverId}`).emit("driver:rideCancelled", { ride, cancelledBy: "user" });
         }
       }
     }
