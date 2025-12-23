@@ -424,14 +424,19 @@ module.exports = {
     if (!riderId) return res.json(responseData("NOT_AUTHORIZED", {}, req, false));
     if (!rideId) return res.json(responseData("RIDE_ID_REQUIRED", {}, req, false));
 
-    const ride = await Ride.findOne({ _id: rideId, rider: riderId });
-    if (!ride) return res.json(responseData("INVALID_RIDE", {}, req, false));
-    if (ride.paymentMethod !== "cash" || ride.status !== "reachedDestination") {
-      return res.json(responseData("INVALID_RIDE_STATE", {}, req, false));
-    }
-
-    ride.cashPaidByUser = true;
-    await ride.save();
+    const ride = await Ride.findOneAndUpdate(
+      { 
+        _id: rideId, 
+        rider: riderId,
+        paymentMethod: "cash",
+        status: "reachedDestination",
+        paidToDriver: { $ne: true }
+      },
+      { $set: { cashPaidByUser: true } },
+      { new: true }
+    );
+    
+    if (!ride) return res.json(responseData("INVALID_RIDE_STATE", {}, req, false));
     return res.json(responseData("PAYMENT_MARKED", { rideId: ride._id }, req, true));
   },
 
@@ -739,17 +744,20 @@ module.exports = {
     ride.cancellationReason = reason || "Cancelled by user";
     ride.cancelledBy = "user";
     ride.cancelledAt = new Date();
+    ride.otpForRideStart = null;
+    const driverId = ride.driver;
+    ride.driver = null;
     await ride.save();
 
-    if (ride.driver) {
-      await Driver.findByIdAndUpdate(ride.driver, { isAvailable: true });
+    if (driverId) {
+      await Driver.findByIdAndUpdate(driverId, { isAvailable: true });
       const ioInstance = _getIo();
       if (ioInstance) {
-        const driverSocket = getDriverSocketId(ride.driver.toString());
+        const driverSocket = getDriverSocketId(driverId.toString());
         if (driverSocket) {
           ioInstance.to(driverSocket).emit("driver:rideCancelled", { ride, cancelledBy: "user" });
         } else {
-          ioInstance.to(`driver:${ride.driver}`).emit("driver:rideCancelled", { ride, cancelledBy: "user" });
+          ioInstance.to(`driver:${driverId}`).emit("driver:rideCancelled", { ride, cancelledBy: "user" });
         }
       }
     }
