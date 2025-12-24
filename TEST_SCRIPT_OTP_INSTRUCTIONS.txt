@@ -1,0 +1,97 @@
+================================================================================
+HOW TO USE TEST SCRIPT WITH OTP
+================================================================================
+
+WORKFLOW:
+
+================================================================================
+MONGODB COMMAND TO SETUP DRIVER FOR TESTING
+================================================================================
+
+Copy and paste this command in MongoDB shell or MongoDB Compass:
+
+db.drivers.updateOne(
+  { mobile: "9876543210" },
+  {
+    $set: {
+      "location.coordinates": [77.2090, 28.6139],
+      "location.type": "Point",
+      isAvailable: true,
+      status: "active",
+      registrationStatus: "approved",
+      isDeleted: false
+    }
+  }
+)
+
+VERIFY IT WORKED:
+
+db.drivers.findOne(
+  { mobile: "9876543210" },
+  { mobile: 1, location: 1, isAvailable: 1, status: 1, registrationStatus: 1 }
+)
+
+================================================================================
+
+
+---------
+
+Step 1: Run the test script
+   node test-all-flows.js
+
+Step 2: Script will send OTP and display mobileOtpId
+   Example output:
+   ────────────────────────────────────────────────────────────
+   📱 MOBILE OTP ID (use this to get OTP from database):
+      694a39b59a76a99068d35de4
+   ────────────────────────────────────────────────────────────
+   💡 Get OTP from MongoDB:
+      db.otps.findOne({_id: ObjectId("694a39b59a76a99068d35de4")})
+   ────────────────────────────────────────────────────────────
+
+Step 3: Get OTP from MongoDB using the mobileOtpId
+   In MongoDB shell:
+   db.otps.findOne({_id: ObjectId("694a39b59a76a99068d35de4")})
+   
+   This will return something like:
+   {
+     _id: ObjectId("694a39b59a76a99068d35de4"),
+     mobile: "9876543210",
+     otp: "5678",  ← This is what you need!
+     ...
+   }
+
+Step 4: Set OTP as environment variable and re-run
+   export DRIVER_TEST_OTP=5678
+   node test-all-flows.js
+
+   OR run in one command:
+   DRIVER_TEST_OTP=5678 node test-all-flows.js
+
+QUICK EXAMPLE:
+--------------
+# First run (shows mobileOtpId)
+node test-all-flows.js
+
+# Get OTP from database
+# db.otps.findOne({_id: ObjectId("<mobileOtpId>")})
+
+# Second run (with OTP)
+DRIVER_TEST_OTP=5678 node test-all-flows.js
+
+TIPS:
+-----
+✓ mobileOtpId is displayed every time OTP is sent
+✓ OTP changes each time, so get fresh OTP from database
+✓ Use the exact mobileOtpId shown in script output
+✓ OTP expires after some time (check expiresAt in database)
+
+TROUBLESHOOTING:
+----------------
+If OTP verification fails:
+1. Make sure you're using the OTP from the correct mobileOtpId
+2. Check if OTP has expired (expiresAt field in database)
+3. Make sure mobileOtpId matches the one shown in script output
+
+================================================================================
+
