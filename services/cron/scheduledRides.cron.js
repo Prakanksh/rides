@@ -96,6 +96,35 @@ async function activateScheduledRides() {
         continue;
       }
 
+      const otherScheduledRides = await Ride.find({
+        rider: riderId,
+        _id: { $ne: ride._id },
+        isScheduled: true,
+        status: { $in: ["scheduled", "scheduled_ready", "requested", "accepted", "arrived", "ongoing", "reachedDestination"] }
+      });
+
+      const bufferMinutes = 15;
+      const currentRideStartTime = ride.scheduledFor;
+      const currentRideEndTime = new Date(currentRideStartTime.getTime() + (ride.estimatedTime || 0) * 60 * 1000);
+
+      let hasTimeConflict = false;
+      for (const otherRide of otherScheduledRides) {
+        const otherRideStartTime = otherRide.scheduledFor;
+        const otherRideEndTime = new Date(otherRideStartTime.getTime() + (otherRide.estimatedTime || 0) * 60 * 1000);
+
+        const timeDiff1 = Math.abs(currentRideStartTime.getTime() - otherRideEndTime.getTime()) / (1000 * 60);
+        const timeDiff2 = Math.abs(currentRideEndTime.getTime() - otherRideStartTime.getTime()) / (1000 * 60);
+
+        if (timeDiff1 < bufferMinutes || timeDiff2 < bufferMinutes) {
+          hasTimeConflict = true;
+          break;
+        }
+      }
+
+      if (hasTimeConflict) {
+        continue; 
+      }
+
       ride.status = "scheduled_ready";
       await ride.save();
 
