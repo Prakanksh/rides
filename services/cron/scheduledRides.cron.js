@@ -128,6 +128,16 @@ async function activateScheduledRides() {
       }).select("_id");
 
       if (nearbyDrivers.length > 0) {
+        const activeRideCheck = await Ride.findOne({
+          rider: riderId,
+          _id: { $ne: ride._id },
+          status: { $in: ["requested", "accepted", "arrived", "ongoing", "reachedDestination"] }
+        });
+
+        if (activeRideCheck) {
+          continue; 
+        }
+
         ride.status = "requested";
         await ride.save();
 
