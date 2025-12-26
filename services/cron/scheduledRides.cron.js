@@ -107,6 +107,22 @@ async function activateScheduledRides() {
 
       const driverIds = vehicles.map(v => v.driver);
       if (driverIds.length === 0) {
+        ride.status = "cancelled";
+        ride.cancelledBy = "system";
+        ride.cancelledAt = new Date();
+        ride.cancellationReason = `No ${normalizedVehicleType} drivers available`;
+        ride.autoCancelled = true;
+        await ride.save();
+
+        const user = await User.findById(riderId).select("_id firstName lastName email deviceType deviceToken notifications");
+        if (user) {
+          await sendNotificationAndroidIosUser(user, "Scheduled Ride Cancelled", `Your scheduled ride has been cancelled because no ${normalizedVehicleType} drivers are available.`);
+        }
+
+        sendToUser(riderId.toString(), "user:scheduledRideCancelled", {
+          ride: ride,
+          message: `Your scheduled ride has been cancelled because no ${normalizedVehicleType} drivers are available.`
+        });
         continue;
       }
 
