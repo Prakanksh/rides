@@ -138,17 +138,6 @@ function calculateFare(distanceKm = 0, options = {}) {
 
 
 
-// const { calculateFare, defaults } = require("./fareCalculator"); // your current file
-
-// each vehicle type multiplier
-const VEHICLE_MULTIPLIERS = {
-  "two-wheeler": 0.8,
-  "auto": 0.9,
-  "mini": 1.0,
-  "prime-sedan": 1.2,
-  "suv": 1.4
-};
-
 const calculateAllVehicleFares = async (distanceKm) => {
   try {
     const surgeMultiplier = 1; // Default surge multiplier
@@ -156,13 +145,13 @@ const calculateAllVehicleFares = async (distanceKm) => {
 
     const results = [];
 
-    for (const vehicleType of Object.keys(VEHICLE_MULTIPLIERS)) {
+    for (const vehicleType of Object.keys(vehicleMultipliers)) {
 
       // 1️⃣ Calculate base fare using your existing function
       const baseFare = calculateFare(distanceKm);
 
       // 2️⃣ Apply vehicle multiplier
-      const vehicleMultiplier = VEHICLE_MULTIPLIERS[vehicleType];
+      const vehicleMultiplier = vehicleMultipliers[vehicleType];
       const vehicleAdjusted = baseFare.breakdown.subtotal * vehicleMultiplier;
 
       const surgedAmount = vehicleAdjusted * surgeMultiplier;
