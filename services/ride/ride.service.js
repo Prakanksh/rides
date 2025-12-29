@@ -246,6 +246,15 @@ module.exports = {
         return res.json(responseData("NOT_AUTHORIZED", {}, req, false));
       }
 
+      // Block if user has an active ride (not estimating - those are temporary)
+      const activeRide = await Ride.findOne({
+        rider: riderId,
+        status: { $in: ["requested", "accepted", "arrived", "ongoing", "reachedDestination"] }
+      });
+      if (activeRide) {
+        return res.json(responseData("ACTIVE_RIDE_EXISTS", { rideId: activeRide._id }, req, false));
+      }
+
       if (!pickupLocation?.coordinates || !dropLocation?.coordinates) {
         return res.json(responseData("LOCATIONS_REQUIRED", {}, req, false));
       }
