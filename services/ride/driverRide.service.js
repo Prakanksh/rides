@@ -79,12 +79,29 @@ module.exports = {
   },
 
   acceptRide: async (req, res) => {
+    const driverId = req.user._id;
+
+    // Check if driver's vehicle matches the ride's requested vehicle type
+    const driverVehicle = await Vehicle.findOne({ driver: driverId, status: "active" });
+    if (!driverVehicle) {
+      return res.json(responseData("NO_ACTIVE_VEHICLE", {}, req, false));
+    }
+
     const ride = await Ride.findById(req.body.rideId);
     if (!ride) return res.json(responseData("RIDE_NOT_FOUND", {}, req, false));
     if (ride.status !== "requested")
       return res.json(responseData("RIDE_ALREADY_ASSIGNED", {}, req, false));
 
-    ride.driver = req.user._id;
+    // Validate vehicle type matches
+    const normalizedRideType = ride.vehicleType === "prime sedan" ? "prime-sedan" : ride.vehicleType;
+    if (driverVehicle.type !== normalizedRideType) {
+      return res.json(responseData("VEHICLE_TYPE_MISMATCH", { 
+        required: ride.vehicleType, 
+        yourVehicle: driverVehicle.type 
+      }, req, false));
+    }
+
+    ride.driver = driverId;
     ride.status = "accepted";
     
     const otp = genOtp();
