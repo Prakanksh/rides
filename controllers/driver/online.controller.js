@@ -11,12 +11,11 @@ module.exports.goOnline = async (req, res) => {
     }
 
     await Driver.findByIdAndUpdate(driverId, {
-      isOnline: true,
-      currentLocation: {
+      isAvailable: true,
+      location: {
         type: "Point",
         coordinates: [lng, lat]
-      },
-      vehicleType
+      }
     });
 
     return res.json(responseData("DRIVER_ONLINE", {}, req, true));

@@ -420,8 +420,8 @@ function initSocketIO(io) {
           return;
         }
 
-        // Calculate and apply cancellation penalty if ride was accepted
-        const wasAccepted = ride.status === "accepted" && ride.driver;
+        // Calculate and apply cancellation penalty if ride was accepted or driver arrived
+        const wasAccepted = (ride.status === "accepted" || ride.status === "arrived") && ride.driver;
         if (wasAccepted) {
           try {
             const settings = await AdminSetting.findOne({});

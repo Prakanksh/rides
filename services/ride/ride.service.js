@@ -446,6 +446,12 @@ module.exports = {
     );
     
     if (!ride) return res.json(responseData("INVALID_RIDE_STATE", {}, req, false));
+
+    // Notify driver that user has paid
+    if (ride.driver) {
+      sendToUser(ride.driver.toString(), "driver:userPaid", { rideId: ride._id });
+    }
+
     return res.json(responseData("PAYMENT_MARKED", { rideId: ride._id }, req, true));
   },
 
@@ -724,8 +730,8 @@ module.exports = {
       return res.json(responseData("CANNOT_CANCEL_RIDE_IN_PROGRESS", {}, req, false));
     }
 
-    // Calculate and apply cancellation penalty if ride was accepted (before changing status)
-    const wasAccepted = ride.status === "accepted" && ride.driver;
+    // Calculate and apply cancellation penalty if ride was accepted or driver arrived (before changing status)
+    const wasAccepted = (ride.status === "accepted" || ride.status === "arrived") && ride.driver;
     if (wasAccepted) {
       try {
         const settings = await AdminSetting.findOne({});

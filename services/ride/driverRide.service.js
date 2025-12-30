@@ -157,6 +157,9 @@ module.exports = {
     ride.startedAt = new Date();
     await ride.save();
 
+    // Notify user that ride has started
+    sendToUser(ride.rider.toString(), "user:rideStarted", { ride });
+
     return res.json(responseData("RIDE_STARTED", { ride }, req, true));
   },
 
@@ -284,23 +287,15 @@ module.exports = {
       return res.json(responseData("CANNOT_CANCEL_RIDE_IN_PROGRESS", {}, req, false));
     }
    if (ride.status === "accepted" || ride.status === "arrived") {
-   
-const penaltySetting = await adminSettingModel.findOne({ key: "driverCancellationPenalties" });
+      const adminSettings = await adminSettingModel.findOne({});
+      const penaltyPercentage = adminSettings?.driverCancelationFee || 5;
+      const penaltyCharge = ride.finalFare * penaltyPercentage / 100;
 
-const penaltyPercentage = penaltySetting ? parseFloat(penaltySetting.driverCancelationFee) : 5;
-
-const paneltyCharege = ride.finalFare * penaltyPercentage / 100;
-
- await Driver.findByIdAndUpdate(
-    driverId,
-    { 
-        $inc: { 
-            penalties: paneltyCharege
-        } 
-    },
-    { new: true }
-);
-
+      await Driver.findByIdAndUpdate(
+        driverId,
+        { $inc: { penalties: penaltyCharge } },
+        { new: true }
+      );
     }
     ride.cancelledDrivers.push(driverId);
     ride.driver = null;
