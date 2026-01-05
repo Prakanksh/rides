@@ -36,6 +36,7 @@ crons.scheduledRidesActivation();
 crons.autoCancelRides();
 crons.penalitySettlement();
 crons.recoverDriverAvailability();
+crons.calculateSurge();
 const corsOption = {
   methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
   exposedHeaders: ['x-access-token']

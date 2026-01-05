@@ -10,6 +10,7 @@ const { activateScheduledRides } = require("../services/cron/scheduledRides.cron
 const { autoCancelRides } = require("../services/cron/autoCancelRides.cron");
 const { penalitySettlementCron } = require("../services/cron/penalitySettlement.cron");
 const { recoverDriverAvailability } = require("../services/cron/recoverDriverAvailability.cron");
+const { calculateSurgeHeatmap } = require("../services/cron/calculateSurge.cron");
 // const { cashSettlementSchedule, walletSettlementSchedule } = require("../configs/cron.config");
 
 let crons = {
@@ -79,6 +80,13 @@ job.start();
         console.log("🔧 Driver availability recovery cron: Every 5 minutes");
         let job = cron.schedule("*/5 * * * *", async () => {
             await recoverDriverAvailability();
+        });
+        job.start();
+    },
+    calculateSurge: async () => {
+        console.log("🔥 Surge heatmap calculation cron: Every 5 minutes");
+        let job = cron.schedule("*/5 * * * *", async () => {
+            await calculateSurgeHeatmap();
         });
         job.start();
     }

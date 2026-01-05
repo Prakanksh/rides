@@ -263,8 +263,9 @@ module.exports = {
       const [dropLng, dropLat] = dropLocation.coordinates;
       const distanceKm = calculateDistanceInKm(pickupLat, pickupLng, dropLat, dropLng);
 
-      // Calculate fare for all vehicle types
-      const fareData = await calculateAllVehicleFares(distanceKm);
+      // Calculate fare for all vehicle types WITH surge pricing
+      // Pass pickupLocation to get surge multiplier for each vehicle type
+      const fareData = await calculateAllVehicleFares(distanceKm, pickupLocation);
 
       // Create ride with status "estimating" (no vehicle type selected yet)
       const ride = await Ride.create({

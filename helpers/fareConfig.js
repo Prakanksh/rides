@@ -138,45 +138,49 @@ function calculateFare(distanceKm = 0, options = {}) {
 
 
 
-const calculateAllVehicleFares = async (distanceKm) => {
+const calculateAllVehicleFares = async (distanceKm, pickupLocation = null) => {
   try {
-    const surgeMultiplier = 1; // Default surge multiplier
     const tip = 0; // Default tip
+
+    // Import surge service (lazy import to avoid circular dependency)
+    let getSurgeForPickupLocation;
+    try {
+      const surgeService = require("../services/ride/surge.service");
+      getSurgeForPickupLocation = surgeService.getSurgeForPickupLocation;
+    } catch (err) {
+      console.warn("Surge service not available, using default surge multiplier");
+    }
 
     const results = [];
 
     for (const vehicleType of Object.keys(vehicleMultipliers)) {
+      // Get surge multiplier for this vehicle type and pickup location
+      let surgeMultiplier = 1.0; // Default surge
+      
+      if (pickupLocation && getSurgeForPickupLocation) {
+        try {
+          const surgeData = await getSurgeForPickupLocation(pickupLocation, vehicleType);
+          surgeMultiplier = surgeData.surgeMultiplier || 1.0;
+        } catch (error) {
+          console.error(`Error getting surge for ${vehicleType}:`, error);
+          // Use default surge on error
+          surgeMultiplier = 1.0;
+        }
+      }
 
       // 1️⃣ Calculate base fare using your existing function
-      const baseFare = calculateFare(distanceKm);
+      const baseFare = calculateFare(distanceKm, {
+        vehicleType,
+        surgeMultiplier,
+        tip
+      });
 
-      // 2️⃣ Apply vehicle multiplier
-      const vehicleMultiplier = vehicleMultipliers[vehicleType];
-      const vehicleAdjusted = baseFare.breakdown.subtotal * vehicleMultiplier;
-
-      const surgedAmount = vehicleAdjusted * surgeMultiplier;
-      const total = surgedAmount + tip;
-
-      // 3️⃣ Build response model for each vehicle
+      // 2️⃣ Build response model for each vehicle
       results.push({
         vehicleType,
-        estimatedFare: Number(total.toFixed(2)),
-
-        // breakdown: {
-        //   base: baseFare.breakdown.base,
-        //   distanceCharge: baseFare.breakdown.distanceCharge,
-        //   subtotal: Number(baseFare.breakdown.subtotal.toFixed(2)),
-
-        //   vehicleMultiplier,
-        //   vehicleAdjusted: Number(vehicleAdjusted.toFixed(2)),
-
-        //   surgedAmount: Number(surgedAmount.toFixed(2)),
-        //   surgeMultiplier,
-        //   tip,
-        //   total: Number(total.toFixed(2)),
-        // },
-
-        // currency: defaults.currency
+        estimatedFare: baseFare.estimatedFare,
+        surgeMultiplier: Number(surgeMultiplier.toFixed(2)),
+        breakdown: baseFare.breakdown
       });
     }
 
@@ -184,11 +188,18 @@ const calculateAllVehicleFares = async (distanceKm) => {
 
   } catch (error) {
     console.error("Fare calculation error:", error);
-    // res.status(500).json({
-    //   success: false,
-    //   message: "Something went wrong.",
-    //   error: error.message
-    // });
+    // Fallback: return fares without surge if error occurs
+    const results = [];
+    for (const vehicleType of Object.keys(vehicleMultipliers)) {
+      const baseFare = calculateFare(distanceKm, { vehicleType });
+      results.push({
+        vehicleType,
+        estimatedFare: baseFare.estimatedFare,
+        surgeMultiplier: 1.0,
+        breakdown: baseFare.breakdown
+      });
+    }
+    return results;
   }
 };
 
