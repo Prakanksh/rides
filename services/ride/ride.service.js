@@ -6,6 +6,7 @@ const AdminSetting = require("../../models/adminSetting.model");
 const { responseData } = require("../../helpers/responseData");
 const { calculateDistanceInKm } = require("../../helpers/distance");
 const { calculateFare, calculateAllVehicleFares } = require("../../helpers/fareConfig");
+const { getSurgeForPickupLocation } = require("./surge.service");
 const { sendRideToDriver, sendToUser, _getIo } = require("../../socket/emitRide");
 const { getDriverSocketId } = require("../../socket/driverSocketMap");
 const { calculateETA } = require("../../helpers/etaCalculator");
@@ -132,8 +133,29 @@ module.exports = {
         }
       }
 
-      // Calculate promo discount if promo code is provided
-      const fareResult = calculateFare(distance, { vehicleType: normalizedVehicleType });
+      // Get surge multiplier for this vehicle type and pickup location
+      let surgeMultiplier = 1.0;
+      try {
+        const surgeData = await getSurgeForPickupLocation(pickupLocation, normalizedVehicleType);
+        surgeMultiplier = surgeData?.surgeMultiplier || 1.0;
+      } catch (error) {
+        // Improved error handling: Log detailed error with context
+        console.error("Error getting surge in createRide:", {
+          error: error.message,
+          rideId: rideId,
+          vehicleType: normalizedVehicleType,
+          location: pickupLocation?.coordinates,
+          stack: error.stack
+        });
+        // Use default surge on error to prevent ride creation failure
+        surgeMultiplier = 1.0;
+      }
+
+      // Calculate fare WITH surge pricing
+      const fareResult = calculateFare(distance, { 
+        vehicleType: normalizedVehicleType,
+        surgeMultiplier: surgeMultiplier
+      });
       const originalFare = Number((fareResult?.estimatedFare || 0).toFixed(2));
       let discountAmount = 0;
       let finalFare = originalFare;
@@ -579,8 +601,29 @@ module.exports = {
         }
       }
 
-      // Calculate promo discount if promo code is provided
-      const fareResult = calculateFare(distance, { vehicleType: normalizedVehicleType });
+      // Get surge multiplier for this vehicle type and pickup location
+      let surgeMultiplier = 1.0;
+      try {
+        const surgeData = await getSurgeForPickupLocation(existingRide.pickupLocation, normalizedVehicleType);
+        surgeMultiplier = surgeData?.surgeMultiplier || 1.0;
+      } catch (error) {
+        // Improved error handling: Log detailed error with context
+        console.error("Error getting surge in scheduleRide:", {
+          error: error.message,
+          rideId: rideId,
+          vehicleType: normalizedVehicleType,
+          location: existingRide.pickupLocation?.coordinates,
+          stack: error.stack
+        });
+        // Use default surge on error to prevent ride scheduling failure
+        surgeMultiplier = 1.0;
+      }
+
+      // Calculate fare WITH surge pricing
+      const fareResult = calculateFare(distance, { 
+        vehicleType: normalizedVehicleType,
+        surgeMultiplier: surgeMultiplier
+      });
       const originalFare = Number((fareResult?.estimatedFare || 0).toFixed(2));
       let discountAmount = 0;
       let finalFare = originalFare;

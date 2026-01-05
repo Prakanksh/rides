@@ -45,6 +45,11 @@ const DriverSchema = new mongoose.Schema(
       type: { type: String, enum: ['Point'], default: 'Point' },
       coordinates: { type: [Number], default: [0, 0] }
     },
+    h3Index: {
+      type: String,
+      default: null,
+      index: true
+    },
     wallet: { type: Number, default: 0 },
     driverCommission: { type: Number, default: 0 },
     isAvailable: { type: Boolean, default: true },

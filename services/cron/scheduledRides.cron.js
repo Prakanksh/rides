@@ -5,6 +5,9 @@ const User = require("../../models/user.model");
 const Notification = require("../../models/notification.model");
 const sendNotification = require("../../helpers/firebase-admin");
 const { sendRideToDriver, sendToUser } = require("../../socket/emitRide");
+const { calculateFare } = require("../../helpers/fareConfig");
+const { getSurgeForPickupLocation } = require("../ride/surge.service");
+const { calculateDistanceInKm } = require("../../helpers/distance");
 const _ = require("lodash");
 
 async function sendNotificationAndroidIosUser(receiverUser, title, description) {
@@ -183,14 +186,70 @@ async function activateScheduledRides() {
           continue; 
         }
 
+        // Recalculate fare with CURRENT surge pricing (at activation time, not scheduling time)
+        let recalculatedFare = ride.finalFare; // Default to existing fare
+        let user = null;
+        
+        try {
+          const [pickupLng, pickupLat] = ride.pickupLocation.coordinates;
+          const [dropLng, dropLat] = ride.dropLocation.coordinates;
+          const distance = calculateDistanceInKm(pickupLat, pickupLng, dropLat, dropLng);
+          
+          // Get current surge multiplier for this vehicle type and pickup location
+          const surgeData = await getSurgeForPickupLocation(ride.pickupLocation, normalizedVehicleType);
+          const surgeMultiplier = surgeData.surgeMultiplier || 1.0;
+          
+          // Recalculate fare with current surge
+          const fareResult = calculateFare(distance, {
+            vehicleType: normalizedVehicleType,
+            surgeMultiplier: surgeMultiplier
+          });
+          
+          recalculatedFare = Number((fareResult?.estimatedFare || ride.finalFare).toFixed(2));
+          
+          // Apply existing promo discount if any
+          if (ride.promoCode && recalculatedFare > 0) {
+            const { calculateDiscount } = require("../../helpers/promoUtil");
+            const discountResult = await calculateDiscount(ride.promoCode, recalculatedFare);
+            if (discountResult.isValid) {
+              const discountAmount = discountResult.discountAmount;
+              recalculatedFare = Math.max(0, Number((recalculatedFare - discountAmount).toFixed(2)));
+            }
+          }
+          
+          // Get user for penalty check and notification
+          user = await User.findById(riderId).select("_id firstName lastName email deviceType deviceToken notifications cancellationPenalty");
+          
+          // Apply cancellation penalty if user has pending penalty
+          if (user && user.cancellationPenalty > 0) {
+            const penaltyAmount = Number((user.cancellationPenalty || 0).toFixed(2));
+            recalculatedFare = Number((recalculatedFare + penaltyAmount).toFixed(2));
+          }
+        } catch (error) {
+          // Improved error handling: Log detailed error with context
+          console.error("Error recalculating fare for scheduled ride activation:", {
+            error: error.message,
+            rideId: ride._id,
+            vehicleType: normalizedVehicleType,
+            location: ride.pickupLocation?.coordinates,
+            stack: error.stack
+          });
+          // Use existing fare if recalculation fails
+          // Get user for notification if not already fetched
+          if (!user) {
+            user = await User.findById(riderId).select("_id firstName lastName email deviceType deviceToken notifications");
+          }
+        }
+
+        // Update ride with recalculated fare and activate
         ride.status = "requested";
+        ride.finalFare = recalculatedFare;
+        ride.originalFare = recalculatedFare; // Update original fare to reflect current surge
         await ride.save();
 
         nearbyDrivers.forEach(driver => {
           sendRideToDriver(driver._id.toString(), ride);
         });
-
-        const user = await User.findById(riderId).select("_id firstName lastName email deviceType deviceToken notifications");
         if (user) {
           await sendNotificationAndroidIosUser(user, "Scheduled Ride Activated", "Your scheduled ride is now active. Driver matching has started.");
         }
