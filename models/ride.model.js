@@ -60,6 +60,12 @@ const RideSchema = new mongoose.Schema(
     originalFare: { type: Number, default: 0 },
     discountAmount: { type: Number, default: 0 },
     cancellationPenalty: { type: Number, default: 0 },
+    surgeMultiplier: { 
+      type: Number, 
+      default: 1.0, 
+      min: 1.0, 
+      max: 5.0 
+    },
     paymentMethod: {
       type: String,
       enum: ["cash", "online", "wallet"],

@@ -207,6 +207,8 @@ async function activateScheduledRides() {
           
           recalculatedFare = Number((fareResult?.estimatedFare || ride.finalFare).toFixed(2));
           
+          ride.surgeMultiplier = Number(surgeMultiplier.toFixed(2));
+          
           // Apply existing promo discount if any
           if (ride.promoCode && recalculatedFare > 0) {
             const { calculateDiscount } = require("../../helpers/promoUtil");
