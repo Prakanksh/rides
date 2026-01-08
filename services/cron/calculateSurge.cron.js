@@ -2,7 +2,7 @@ const Driver = require("../../models/driver.model");
 const Ride = require("../../models/ride.model");
 const Vehicle = require("../../models/vehicle.model");
 const SurgeHeatmap = require("../../models/surgeHeatmap.model");
-const { latLngToH3, h3ToLatLng, DEFAULT_HEATMAP_RESOLUTION } = require("../../helpers/h3Util");
+const { latLngToH3, h3ToLatLng, getH3Resolution, DEFAULT_HEATMAP_RESOLUTION } = require("../../helpers/h3Util");
 
 // Surge calculation configuration
 const SURGE_CONFIG = {
@@ -80,7 +80,7 @@ async function calculateSurgeHeatmap() {
         $exists: true,
         $ne: [0, 0]
       }
-    }).select("_id location").lean();
+    }).select("_id location h3Index").lean();
 
     console.log(`📊 Found ${activeDrivers.length} active drivers`);
 
@@ -110,8 +110,22 @@ async function calculateSurgeHeatmap() {
 
     for (const driver of activeDrivers) {
       if (driver.location && driver.location.coordinates) {
-        const [lng, lat] = driver.location.coordinates; // GeoJSON: [lng, lat]
-        const h3Index = latLngToH3(lat, lng, resolution);
+        // Use stored h3Index if available and at correct resolution, otherwise calculate
+        let h3Index = null;
+        if (driver.h3Index) {
+          // Check if stored h3Index is at the correct resolution
+          const storedResolution = getH3Resolution(driver.h3Index);
+          if (storedResolution === resolution) {
+            h3Index = driver.h3Index;
+          }
+        }
+        
+        // Fallback to calculation if h3Index not available or wrong resolution
+        if (!h3Index) {
+          const [lng, lat] = driver.location.coordinates; // GeoJSON: [lng, lat]
+          h3Index = latLngToH3(lat, lng, resolution);
+        }
+        
         const vehicleType = driverVehicleMap[driver._id.toString()];
 
         if (h3Index && vehicleType) {
@@ -268,8 +282,38 @@ async function calculateSurgeHeatmap() {
   }
 }
 
+/**
+ * Cleanup old surge heatmap data (older than 1 hour)
+ * This prevents database from growing indefinitely
+ */
+async function cleanupOldSurgeData() {
+  try {
+    const startTime = Date.now();
+    console.log("🧹 Starting surge heatmap cleanup...");
+
+    // Delete surge data older than 1 hour
+    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+    
+    const result = await SurgeHeatmap.deleteMany({
+      calculatedAt: { $lt: oneHourAgo }
+    });
+
+    const duration = Date.now() - startTime;
+    console.log(`✅ Surge heatmap cleanup completed: Deleted ${result.deletedCount} old records in ${duration}ms`);
+
+    return {
+      deletedCount: result.deletedCount,
+      duration
+    };
+  } catch (error) {
+    console.error("❌ Error cleaning up old surge heatmap data:", error);
+    throw error;
+  }
+}
+
 module.exports = {
   calculateSurgeHeatmap,
+  cleanupOldSurgeData,
   SURGE_CONFIG
 };
 
