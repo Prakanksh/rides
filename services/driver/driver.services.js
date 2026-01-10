@@ -210,18 +210,18 @@ if (!['two-wheeler', 'auto', 'mini', 'prime-sedan', 'suv'].includes(vehicleType)
 
   updateLocation: async (req, res) => {
     try {
-      const driverId = req.user?._id; // comes from verifyToken
+      const driverId = req.user?._id;
       const { lat, lng } = req.body;
 
       if (!driverId) {
         return res.json(responseData("NOT_AUTHORIZED", {}, req, false));
       }
 
-      if (!lat || !lng) {
-        return res.json(responseData("LOCATION_REQUIRED", {}, req, false));
+      const { isValidCoordinate } = require("../../helpers/coordinateValidator");
+      if (!isValidCoordinate(lat, lng)) {
+        return res.json(responseData("INVALID_COORDINATES", {}, req, false));
       }
 
-      // Calculate H3 index for faster surge queries
       const { latLngToH3, H3_RESOLUTION } = require("../../helpers/h3Util");
       const h3Index = latLngToH3(lat, lng, H3_RESOLUTION.NEIGHBORHOOD || 9);
 
@@ -230,7 +230,7 @@ if (!['two-wheeler', 'auto', 'mini', 'prime-sedan', 'suv'].includes(vehicleType)
         {
           location: {
             type: "Point",
-            coordinates: [lng, lat] // GeoJSON format: [lng, lat]
+            coordinates: [lng, lat]
           },
           h3Index: h3Index
         },

@@ -5,6 +5,7 @@ const User = require("../models/user.model");
 const AdminSetting = require("../models/adminSetting.model");
 const { ensureWallets, payByWallet, payByCash, confirmCashPayment, resolveRideFare } = require("../helpers/walletUtil");
 const { latLngToH3, H3_RESOLUTION } = require("../helpers/h3Util");
+const { isValidCoordinate } = require("../helpers/coordinateValidator");
 let ioInstance = null;
 
 const {
@@ -41,21 +42,17 @@ function initSocketIO(io) {
     socket.on("driver:location", async (data) => {
       try {
         const { driverId, lat, lng } = data || {};
-        if (!driverId || lat == null || lng == null) return;
+        if (!driverId || !isValidCoordinate(lat, lng)) return;
         
-        // Update in-memory driver location map
         updateDriverLocation(driverId, lat, lng);
-        
-        // Calculate H3 index for faster surge queries
         const h3Index = latLngToH3(lat, lng, H3_RESOLUTION.NEIGHBORHOOD || 9);
         
-        // Update database with location and H3 index (non-blocking)
         Driver.findByIdAndUpdate(
           driverId,
           {
             location: {
               type: "Point",
-              coordinates: [lng, lat] // GeoJSON format: [lng, lat]
+              coordinates: [lng, lat]
             },
             h3Index: h3Index
           },
