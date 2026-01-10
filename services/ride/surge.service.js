@@ -1,5 +1,5 @@
 const SurgeHeatmap = require("../../models/surgeHeatmap.model");
-const { latLngToH3, DEFAULT_HEATMAP_RESOLUTION } = require("../../helpers/h3Util");
+const { latLngToH3, getH3Neighbors, DEFAULT_HEATMAP_RESOLUTION } = require("../../helpers/h3Util");
 
 /**
  * Get surge multiplier for a given location and vehicle type
@@ -37,12 +37,60 @@ async function getSurgeMultiplier(lat, lng, vehicleType, resolution = DEFAULT_HE
       vehicleType: normalizedVehicleType
     })
       .sort({ calculatedAt: -1 })
-      .select("surgeMultiplier driverCount requestCount demandSupplyRatio calculatedAt vehicleType")
+      .select("surgeMultiplier driverCount requestCount demandSupplyRatio calculatedAt vehicleType h3Index")
       .lean();
 
-    if (!surgeData) {
-      // No surge data found for this hexagon and vehicle type (might be a new area or vehicle type)
-      // Return default surge multiplier
+    const now = new Date();
+    const maxAge = 10 * 60 * 1000; // 10 minutes in milliseconds
+
+    // Check if data exists and is fresh
+    let validSurgeData = null;
+    if (surgeData) {
+      const dataAge = now - new Date(surgeData.calculatedAt);
+      if (dataAge <= maxAge) {
+        validSurgeData = surgeData;
+      }
+    }
+
+    // If exact hexagon has no valid surge data, check only level 1 (direct) neighbors
+    if (!validSurgeData) {
+      // Get ring 1 neighbors (direct neighbors only - 6 immediate neighbors)
+      // Note: getH3Neighbors(h3Index, 1) returns center + ring 1, so filter out center
+      const ring1WithCenter = getH3Neighbors(h3Index, 1); // Includes center + 6 immediate neighbors
+      const ring1Neighbors = ring1WithCenter.filter(hex => hex !== h3Index); // Only direct neighbors
+      
+      if (ring1Neighbors.length > 0) {
+        // Find surge data from direct neighbors only
+        const neighborSurgeData = await SurgeHeatmap.find({
+          h3Index: { $in: ring1Neighbors },
+          vehicleType: normalizedVehicleType,
+          calculatedAt: { $gte: new Date(now - maxAge) } // Only non-stale data
+        })
+          .sort({ calculatedAt: -1 })
+          .select("surgeMultiplier driverCount requestCount demandSupplyRatio calculatedAt vehicleType h3Index")
+          .lean();
+
+        if (neighborSurgeData && neighborSurgeData.length > 0) {
+          // Use first available neighbor's surge data (all are equally close - ring 1)
+          const bestNeighborData = neighborSurgeData[0];
+          
+          // Use neighbor's surge data but mark as found from neighbor
+          return {
+            surgeMultiplier: bestNeighborData.surgeMultiplier || 1.0,
+            h3Index, // Original hexagon
+            neighborH3Index: bestNeighborData.h3Index, // Hexagon where surge was found
+            vehicleType: normalizedVehicleType,
+            driverCount: bestNeighborData.driverCount || 0,
+            requestCount: bestNeighborData.requestCount || 0,
+            demandSupplyRatio: bestNeighborData.demandSupplyRatio || 0,
+            found: true,
+            fromNeighbor: true, // Flag to indicate data came from neighbor
+            calculatedAt: bestNeighborData.calculatedAt
+          };
+        }
+      }
+      
+      // No surge data found in exact hexagon or direct neighbors - return 1.0x
       return {
         surgeMultiplier: 1.0,
         h3Index,
@@ -50,39 +98,21 @@ async function getSurgeMultiplier(lat, lng, vehicleType, resolution = DEFAULT_HE
         driverCount: 0,
         requestCount: 0,
         demandSupplyRatio: 0,
-        found: false
-      };
-    }
-
-    // Check if data is too old (older than 10 minutes = stale)
-    const now = new Date();
-    const dataAge = now - new Date(surgeData.calculatedAt);
-    const maxAge = 10 * 60 * 1000; // 10 minutes in milliseconds
-
-    if (dataAge > maxAge) {
-      // Data is stale, return default surge
-      return {
-        surgeMultiplier: 1.0,
-        h3Index,
-        vehicleType: normalizedVehicleType,
-        driverCount: surgeData.driverCount || 0,
-        requestCount: surgeData.requestCount || 0,
-        demandSupplyRatio: surgeData.demandSupplyRatio || 0,
         found: false,
-        stale: true
+        stale: surgeData ? true : false // Mark as stale if data existed but was old
       };
     }
 
-    // Return surge data
+    // Return surge data from exact hexagon (data is fresh)
     return {
-      surgeMultiplier: surgeData.surgeMultiplier || 1.0,
+      surgeMultiplier: validSurgeData.surgeMultiplier || 1.0,
       h3Index,
       vehicleType: normalizedVehicleType,
-      driverCount: surgeData.driverCount || 0,
-      requestCount: surgeData.requestCount || 0,
-      demandSupplyRatio: surgeData.demandSupplyRatio || 0,
+      driverCount: validSurgeData.driverCount || 0,
+      requestCount: validSurgeData.requestCount || 0,
+      demandSupplyRatio: validSurgeData.demandSupplyRatio || 0,
       found: true,
-      calculatedAt: surgeData.calculatedAt
+      calculatedAt: validSurgeData.calculatedAt
     };
 
   } catch (error) {
