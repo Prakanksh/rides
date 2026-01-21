@@ -121,12 +121,44 @@ function initSocketIO(io) {
         // Set driver as unavailable when ride is accepted
         await Driver.findByIdAndUpdate(driverId, { isAvailable: false });
 
+        // Fetch driver and vehicle details for user
+        const driver = await Driver.findById(driverId).select("firstName lastName mobile countryCode rating");
+        const vehicle = await Vehicle.findOne({ driver: driverId, status: "active" }).select("type number model color");
+
+        const driverDetails = driver ? {
+          _id: driver._id,
+          fullName: `${driver.firstName || ''} ${driver.lastName || ''}`.trim(),
+          mobile: driver.mobile,
+          countryCode: driver.countryCode,
+          rating: driver.rating || null
+        } : null;
+
+        const vehicleDetails = vehicle ? {
+          _id: vehicle._id,
+          type: vehicle.type,
+          number: vehicle.number,
+          model: vehicle.model,
+          color: vehicle.color
+        } : null;
+
         const riderSocket = getUserSocketId(ride.rider);
-        const payloadToUser = { ride, event: "rideAccepted", otp };
+        const payloadToUser = { 
+          ride, 
+          event: "rideAccepted", 
+          otp,
+          driver: driverDetails,
+          vehicle: vehicleDetails
+        };
         if (riderSocket && ioInstance) ioInstance.to(riderSocket).emit("user:rideAccepted", payloadToUser);
         else ioInstance.to(`user:${ride.rider}`).emit("user:rideAccepted", payloadToUser);
 
-        socket.emit("ride:accept:response", { success: true, ride });
+        socket.emit("ride:accept:response", { 
+          success: true, 
+          ride,
+          driver: driverDetails,
+          vehicle: vehicleDetails,
+          otp
+        });
       } catch (e) { console.error("ride:accept err", e); socket.emit("ride:accept:response", { success:false, message:"SERVER_ERROR" }); }
     });
 

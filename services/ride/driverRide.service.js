@@ -111,9 +111,40 @@ module.exports = {
     // Set driver as unavailable when ride is accepted
     await Driver.findByIdAndUpdate(req.user._id, { isAvailable: false });
 
-    sendToUser(ride.rider.toString(), "user:rideAccepted", { ride, event: "rideAccepted", otp });
+    // Fetch driver and vehicle details for user
+    const driver = await Driver.findById(driverId).select("firstName lastName mobile countryCode rating");
+    const vehicle = await Vehicle.findOne({ driver: driverId, status: "active" }).select("type number model color");
 
-    return res.json(responseData("RIDE_ACCEPTED", { ride, otp }, req, true));
+    const driverDetails = driver ? {
+      _id: driver._id,
+      fullName: `${driver.firstName || ''} ${driver.lastName || ''}`.trim(),
+      mobile: driver.mobile,
+      countryCode: driver.countryCode,
+      rating: driver.rating || null
+    } : null;
+
+    const vehicleDetails = vehicle ? {
+      _id: vehicle._id,
+      type: vehicle.type,
+      number: vehicle.number,
+      model: vehicle.model,
+      color: vehicle.color
+    } : null;
+
+    sendToUser(ride.rider.toString(), "user:rideAccepted", { 
+      ride, 
+      event: "rideAccepted", 
+      otp,
+      driver: driverDetails,
+      vehicle: vehicleDetails
+    });
+
+    return res.json(responseData("RIDE_ACCEPTED", { 
+      ride, 
+      otp,
+      driver: driverDetails,
+      vehicle: vehicleDetails
+    }, req, true));
   },
 
   arrivedAtPickup: async (req, res) => {
