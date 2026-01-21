@@ -22,7 +22,8 @@ module.exports = {
         return res.json(responseData('DRIVER_INACTIVE', {}, req, false));
       }
 
-      const otp = generateOTP();
+      // Temporarily use static OTP "1234" for local testing
+      const otp = "1234"; // generateOTP();
       await Otp.deleteMany({ mobile });
 
       const expiresAt = new Date(Date.now() + (process.env.OTP_EXPIRATION_SECONDS || 60) * 1000);

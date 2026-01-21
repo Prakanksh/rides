@@ -7,7 +7,10 @@ const constant = require('../helpers/constant')
 
 const getTokenFromHeaders = (headers) => {
   if (headers?.authorization && headers?.authorization.startsWith('Bearer')) {
-    return headers.authorization.split(' ')[1]
+    let token = headers.authorization.split(' ')[1]
+    // Clean token: remove control characters, trim whitespace
+    token = token ? token.replace(/[\x00-\x1F\x7F]/g, '').trim() : null
+    return token
   }
   return null
 }

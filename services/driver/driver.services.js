@@ -3,6 +3,7 @@ const { responseData } = require('../../helpers/responseData');
 const Driver = require('../../models/driver.model');
 const Vehicle = require('../../models/vehicle.model');
 const supportModel = require('../../models/support.model');
+const { isEmpty } = require('lodash');
 
 // fields allowed maps will be used by updateProfile
 const editableBeforeApproval = [
@@ -267,5 +268,27 @@ const {candidateId} = req.params
     console.error("Support Create Error:", err);
     return res.json(responseData('SERVER_ERROR', {}, req, false));
   }
-}
+},
+
+  logout: async (req, res) => {
+    try {
+      const driver = await Driver.findOne({ _id: req.user._id });
+      if (!isEmpty(driver)) {
+        await Driver.findOneAndUpdate(
+          { _id: req.user._id },
+          {
+            deviceId: null,
+            deviceType: null,
+            deviceToken: null
+          }
+        );
+        return res.json(responseData('LOGOUT', {}, req, true));
+      } else {
+        return res.json(responseData('ERROR_OCCUR', {}, req, false));
+      }
+    } catch (error) {
+      console.log('error', error);
+      return res.status(422).json(responseData(error, {}, req, false));
+    }
+  }
 };

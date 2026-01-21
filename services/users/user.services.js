@@ -100,9 +100,9 @@ module.exports = {
 
       let tempUser = await TempUser.create(userCreate)
 
-      const otpMobile = await generateOTP(4)
+      const otpMobile = "1234"  //await generateOTP(4)
 
-      const otpEmail = await generateEmailOTP()
+      const otpEmail = "1234"   //await generateEmailOTP()
 
       await Otp.deleteMany({ mobile, countryCode })
       await Otp.deleteMany({ email: email.toLowerCase() })
@@ -131,7 +131,8 @@ module.exports = {
         LastName: lastName
       }
       helper.sendEmail("otp-verification", dataBody);
-      await helper.sendOtpTwilio(countryCode, mobile)
+      // Commented for local testing - OTP is stored in DB as "1234"
+      // await helper.sendOtpTwilio(countryCode, mobile)
       res.json(responseData('OTP_SENT_EMAIL_MOBILE', tempUser, req, true))
     } catch (error) {
       console.log('error', error)
@@ -160,43 +161,28 @@ module.exports = {
       const mobileOtpRecord = mobileOtpId ? await Otp.findOne({ _id: mobileOtpId }) : null;
       const emailOtpRecord = emailOtpId ? await Otp.findOne({ _id: emailOtpId }) : null;
 
-      console.log("📌 OTP Records:", { mobileOtpRecord, emailOtpRecord });
-
-      // Basic existence check
       if (!mobileOtpRecord || !emailOtpRecord) {
-        // keep message consistent with your API
         return res.json(responseData("INVALID_MOBILE_EMAIL_OTP", {}, req, false));
       }
 
-      // Validate mobile OTP using helper - helper should return null on success, or error string on failure
-      const mobileOtpResult = await verifyMobileOTP(
-        otpMobile,
-        OTP_EXPIRATION_SECONDS,
-        mobileOtpId
-      );
-
-      // Validate email OTP using helper - helper should return null on success, or error string on failure
-      const emailOtpResult = await verifyEmailOTP(
-        otpEmail,
-        OTP_EXPIRATION_SECONDS,
-        emailOtpId
-      );
-
-      console.log("📌 Validation Results:", { mobileOtpResult, emailOtpResult });
-
-      // If both failed, return combined message
-      if (mobileOtpResult && emailOtpResult) {
-        return res.json(responseData("INVALID_MOBILE_EMAIL_OTP", {}, req, false));
+      if (String(mobileOtpRecord.otp).trim() !== String(otpMobile).trim()) {
+        return res.json(responseData("INVALID_MOBILE_OTP", {}, req, false));
       }
 
-      // If mobile failed
-      if (mobileOtpResult) {
-        return res.json(responseData(mobileOtpResult, {}, req, false));
+      if (String(emailOtpRecord.otp).trim() !== String(otpEmail).trim()) {
+        return res.json(responseData("INVALID_EMAIL_OTP", {}, req, false));
       }
 
-      // If email failed
-      if (emailOtpResult) {
-        return res.json(responseData(emailOtpResult, {}, req, false));
+      const now = new Date();
+      const mobileDiffSec = (now - new Date(mobileOtpRecord.createdAt)) / 1000;
+      const emailDiffSec = (now - new Date(emailOtpRecord.createdAt)) / 1000;
+
+      if (mobileDiffSec > OTP_EXPIRATION_SECONDS) {
+        return res.json(responseData("MOBILE_OTP_EXPIRED", {}, req, false));
+      }
+
+      if (emailDiffSec > OTP_EXPIRATION_SECONDS) {
+        return res.json(responseData("EMAIL_OTP_EXPIRED", {}, req, false));
       }
 
       // At this point both OTPs are valid — create user from TempUser
@@ -509,12 +495,13 @@ module.exports = {
       const isUserExist = await User.findOne({ mobile, countryCode })
       if (!isEmpty(isUserExist)) {
         if (isUserExist?.status === 'active') {
-          const otp = await generateOTP()
+          // For local testing: Always use "1234" as OTP
+          const otp = "1234" // await generateOTP()
           await Otp.deleteMany({ mobile })
           const mobileOtpRecord = await Otp.create({
             mobile,
             countryCode,
-            otp
+            otp: otp
           })
           return res.json(
             responseData(

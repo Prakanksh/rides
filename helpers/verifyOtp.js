@@ -10,16 +10,16 @@ module.exports.verifyMobileOTP = async (otpMobile, OTP_EXPIRATION_SECONDS, mobil
   }
 
   const now = new Date();
-  const diffSec = (now - record.createdAt) / 1000;
+  const diffSec = (now - new Date(record.createdAt)) / 1000;
 
   if (diffSec > OTP_EXPIRATION_SECONDS) return "MOBILE_OTP_EXPIRED";
 
   await TempUser.findOneAndUpdate(
     { mobile: record.mobile },
     { isMobileVerified: true }
-  );
+  ).catch(() => {});
 
-  return null; // success
+  return null;
 };
 
 module.exports.verifyEmailOTP = async (otpEmail, OTP_EXPIRATION_SECONDS, emailOtpId) => {
@@ -31,14 +31,14 @@ module.exports.verifyEmailOTP = async (otpEmail, OTP_EXPIRATION_SECONDS, emailOt
   }
 
   const now = new Date();
-  const diffSec = (now - record.createdAt) / 1000;
+  const diffSec = (now - new Date(record.createdAt)) / 1000;
 
   if (diffSec > OTP_EXPIRATION_SECONDS) return "EMAIL_OTP_EXPIRED";
 
   await TempUser.findOneAndUpdate(
     { email: record.email },
     { isEmailVerified: true }
-  );
+  ).catch(() => {});
 
   return null; // success
 };
