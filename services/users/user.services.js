@@ -767,6 +767,11 @@ module.exports = {
             localField: "_id",
             foreignField: "userId"
           }
+        },
+        {
+          $project: {
+            password: 0
+          }
         }
       ])
       if (isEmpty(userRecord)) {
