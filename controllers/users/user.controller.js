@@ -345,6 +345,22 @@ module.exports = {
     } catch (err) {
       const msg = err.message || 'SOMETHING_WENT_WRONG'
       return res.status(422).json(responseData(msg, {}, req))
-    }}
-   
+    }
+  },
+  requestWalletRecharge: async (req, res) => {
+    try {
+      await userService.requestWalletRecharge(req, res)
+    } catch (err) {
+      const msg = err.message || 'SOMETHING_WENT_WRONG'
+      return res.status(422).json(responseData(msg, {}, req))
+    }
+  },
+  getPaymentDetails: async (req, res) => {
+    try {
+      await userService.getPaymentDetails(req, res)
+    } catch (err) {
+      const msg = err.message || 'SOMETHING_WENT_WRONG'
+      return res.status(422).json(responseData(msg, {}, req))
+    }
+  }
 }

@@ -19,5 +19,7 @@ router
      .patch('/support/:supportId/status', admin.updateSupportStatus)
      .get('/support/inquiries', admin.getSupportInquires)
 .post("/create-promocode", [verifyToken], admin.createPromoCode)
-.post("/create-setting", [verifyToken], admin.createOrUpdateSettings);
+.post("/create-setting", [verifyToken], admin.createOrUpdateSettings)
+.get("/wallet-recharge-requests", [verifyToken], admin.listWalletRechargeRequests)
+.put("/wallet-recharge/:transactionId/verify", [verifyToken], admin.verifyWalletRecharge);
 module.exports = router

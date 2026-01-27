@@ -35,6 +35,17 @@ const AdminSettingSchema = new mongoose.Schema(
     locationMeters: {
       type: Number
     },
+    paymentDetails: {
+      upiId: { type: String, default: null },
+      upiQrCode: { type: String, default: null },
+      bankAccountNumber: { type: String, default: null },
+      bankAccountName: { type: String, default: null },
+      bankName: { type: String, default: null },
+      bankIfsc: { type: String, default: null },
+      bankBranch: { type: String, default: null },
+      chequePayableTo: { type: String, default: null },
+      chequeAddress: { type: String, default: null }
+    },
   },
   {
     timestamps: true,

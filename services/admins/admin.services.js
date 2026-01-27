@@ -25,6 +25,8 @@ const supportModel = require('../../models/support.model')
 const { getSupportInquires, createPromoCode } = require('../../controllers/admins/admin.controller')
 const promoCodeModel = require('../../models/promoCode.model')
 const adminSettingModel = require('../../models/adminSetting.model')
+const Transaction = require('../../models/transactions.model')
+const mongoose = require('mongoose')
 // const subscriptionModel = require('../../models/subscription.model')
 
 module.exports = {
@@ -444,7 +446,177 @@ createPromoCode: async (req, res) => {
     return res.status(422).json(responseData(msg, {}, req));
   }
 },
-
+listWalletRechargeRequests: async (req, res) => {
+  try {
+    let { page, pageSize, status, paymentMethod, startDate, endDate, sortKey, sortType } = req.query;
+    
+    page = parseInt(page) || 1;
+    const limit = parseInt(pageSize) || 10;
+    
+    const condition = {
+      transactionType: "wallet_recharge"
+    };
+    
+    if (status) {
+      condition.status = status;
+    }
+    if (paymentMethod) {
+      condition.paymentMethod = paymentMethod;
+    }
+    
+    // Date range filter
+    if (startDate || endDate) {
+      condition.createdAt = {};
+      if (startDate) {
+        condition.createdAt.$gte = new Date(startDate);
+      }
+      if (endDate) {
+        condition.createdAt.$lte = new Date(endDate);
+      }
+    }
+    
+    const sortPattern = {};
+    if (sortKey && sortType) {
+      sortPattern[sortKey] = sortType === 'asc' ? 1 : -1;
+    } else {
+      sortPattern.createdAt = -1;
+    }
+    
+    const aggregationPipeline = [
+      { $match: condition },
+      {
+        $lookup: {
+          from: "users",
+          localField: "paidById",
+          foreignField: "_id",
+          as: "userDetails"
+        }
+      },
+      { $unwind: { path: "$userDetails", preserveNullAndEmptyArrays: true } },
+      {
+        $project: {
+          transactionId: 1,
+          amount: 1,
+          totalAmount: 1,
+          paymentMethod: 1,
+          status: 1,
+          paymentDetails: 1,
+          createdAt: 1,
+          updatedAt: 1,
+          user: {
+            _id: "$userDetails._id",
+            firstName: "$userDetails.firstName",
+            lastName: "$userDetails.lastName",
+            fullName: "$userDetails.fullName",
+            email: "$userDetails.email",
+            mobile: "$userDetails.mobile"
+          }
+        }
+      },
+      { $sort: sortPattern },
+      { $skip: (page - 1) * limit },
+      { $limit: limit }
+    ];
+    
+    const countPipeline = [
+      { $match: condition },
+      { $count: "total" }
+    ];
+    
+    const [transactions, countResult] = await Promise.all([
+      Transaction.aggregate(aggregationPipeline),
+      Transaction.aggregate(countPipeline)
+    ]);
+    
+    const total = countResult.length > 0 ? countResult[0].total : 0;
+    
+    return res.json(
+      responseData(
+        "WALLET_RECHARGE_REQUESTS",
+        {
+          transactions,
+          pagination: {
+            page,
+            pageSize: limit,
+            total,
+            totalPages: Math.ceil(total / limit)
+          }
+        },
+        req,
+        true
+      )
+    );
+  } catch (err) {
+    console.log("error", err);
+    return res.status(422).json(responseData("ERROR_OCCUR", err.message, req, false));
+  }
+},
+verifyWalletRecharge: async (req, res) => {
+  try {
+    const { transactionId } = req.params;
+    const { status, notes } = req.body;
+    
+    if (!status || !["completed", "failed", "cancelled"].includes(status)) {
+      return res.json(responseData("INVALID_STATUS", {}, req, false));
+    }
+    
+    const transaction = await Transaction.findOne({
+      transactionId,
+      transactionType: "wallet_recharge"
+    });
+    
+    if (!transaction) {
+      return res.json(responseData("TRANSACTION_NOT_FOUND", {}, req, false));
+    }
+    
+    if (transaction.status !== "pending") {
+      return res.json(responseData("TRANSACTION_ALREADY_PROCESSED", {}, req, false));
+    }
+    
+    // Update transaction status
+    const updateData = {
+      status,
+      "paymentDetails.verifiedBy": req.user._id,
+      "paymentDetails.verifiedAt": new Date()
+    };
+    
+    if (notes) {
+      updateData["paymentDetails.adminNotes"] = notes;
+    }
+    
+    await Transaction.updateOne(
+      { _id: transaction._id },
+      { $set: updateData }
+    );
+    
+    // If approved, add amount to user wallet
+    if (status === "completed") {
+      const user = await User.findById(transaction.paidById);
+      if (user) {
+        const currentWallet = Number((user.wallet || 0).toFixed(2));
+        const rechargeAmount = Number(transaction.amount.toFixed(2));
+        user.wallet = Number((currentWallet + rechargeAmount).toFixed(2));
+        await user.save();
+      }
+    }
+    
+    const updatedTransaction = await Transaction.findById(transaction._id)
+      .populate("paidById", "firstName lastName email mobile")
+      .lean();
+    
+    return res.json(
+      responseData(
+        "WALLET_RECHARGE_VERIFIED",
+        { transaction: updatedTransaction },
+        req,
+        true
+      )
+    );
+  } catch (err) {
+    console.log("error", err);
+    return res.status(422).json(responseData("ERROR_OCCUR", err.message, req, false));
+  }
+}
 
 }
 

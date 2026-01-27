@@ -44,7 +44,9 @@ const {
   sendOtpMobileSocialSignUp,
   createSupport,
   subcriptions,
-  buySubscription
+  buySubscription,
+  requestWalletRecharge,
+  getPaymentDetails
 } = require('../../controllers/users/user.controller')
 const { submitSupportRequest } = require('../../services/users/user.services')
 
@@ -134,4 +136,6 @@ router
     .post('/support/:candidateId', [verifyToken], createSupport )
 .get("/subscriptions", [verifyToken], subcriptions)
   .post('/buy-subscription/:planId', [verifyToken], buySubscription)
+  .post('/wallet/recharge', [verifyToken], validationRule.validate('walletRecharge'), requestWalletRecharge)
+  .get('/wallet/payment-details', [verifyToken], getPaymentDetails)
 module.exports = router

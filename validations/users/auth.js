@@ -188,5 +188,20 @@ module.exports.validate = (method) => {
         validatorMiddleware
       ]
     }
+    case 'walletRecharge': {
+      return [
+        body('paymentMethod').notEmpty().withMessage('PAYMENT_METHOD_REQUIRED').isIn(['upi', 'cheque', 'netbanking']).withMessage('INVALID_PAYMENT_METHOD'),
+        body('amount').notEmpty().withMessage('AMOUNT_REQUIRED').isFloat({ min: 1 }).withMessage('INVALID_AMOUNT'),
+        body('upiTransactionId').optional(),
+        body('upiId').optional(),
+        body('chequeNumber').optional(),
+        body('bankName').optional(),
+        body('bankTransactionId').optional(),
+        body('bankAccountNumber').optional(),
+        body('transferDate').optional(),
+        body('notes').optional(),
+        validatorMiddleware
+      ]
+    }
   }
 }

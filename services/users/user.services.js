@@ -1431,7 +1431,155 @@ buySubscription : async (req, res) => {
     console.log(err);
     return res.status(500).json(responseData("ERROR_OCCURED", err.message, req, false));
   }
-}
+},
+  requestWalletRecharge: async (req, res) => {
+    try {
+      const userId = req.user._id;
+      const { paymentMethod, amount, upiTransactionId, upiId, chequeNumber, bankName, bankAccountNumber, bankTransactionId, transferDate, notes } = req.body;
+
+      if (!paymentMethod || !amount || amount <= 0) {
+        return res.json(responseData("INVALID_REQUEST", {}, req, false));
+      }
+
+      // Validate payment method specific fields
+      if (paymentMethod === "upi") {
+        if (!upiTransactionId || !upiId) {
+          return res.json(responseData("UPI_DETAILS_REQUIRED", {}, req, false));
+        }
+      } else if (paymentMethod === "cheque") {
+        if (!chequeNumber || !bankName) {
+          return res.json(responseData("CHEQUE_DETAILS_REQUIRED", {}, req, false));
+        }
+      } else if (paymentMethod === "netbanking") {
+        if (!bankTransactionId || !bankAccountNumber) {
+          return res.json(responseData("BANK_TRANSFER_DETAILS_REQUIRED", {}, req, false));
+        }
+      } else {
+        return res.json(responseData("INVALID_PAYMENT_METHOD", {}, req, false));
+      }
+
+      // Get admin ID
+      const admin = await Admin.findOne({ role: "admin" }).select("_id");
+      if (!admin) {
+        return res.json(responseData("ADMIN_NOT_FOUND", {}, req, false));
+      }
+
+      // Prepare payment details based on method
+      const paymentDetails = {};
+      if (paymentMethod === "upi") {
+        paymentDetails.upiId = upiId;
+        paymentDetails.upiTransactionId = upiTransactionId;
+      } else if (paymentMethod === "cheque") {
+        paymentDetails.chequeNumber = chequeNumber;
+        paymentDetails.bankName = bankName;
+        paymentDetails.chequeDate = transferDate || new Date();
+      } else if (paymentMethod === "netbanking") {
+        paymentDetails.bankTransactionId = bankTransactionId;
+        paymentDetails.bankAccountNumber = bankAccountNumber;
+        paymentDetails.transferDate = transferDate || new Date();
+      }
+      if (notes) {
+        paymentDetails.notes = notes;
+      }
+
+      // Create transaction with pending status
+      const transaction = await Transaction.create({
+        paidBy: "user",
+        paidTo: "admin",
+        paidById: userId,
+        paidToId: admin._id,
+        paymentMethod: paymentMethod,
+        transactionType: "wallet_recharge",
+        amount: Number(amount),
+        totalAmount: Number(amount),
+        currency: "INR",
+        status: "pending",
+        paymentDetails: paymentDetails
+      });
+
+      return res.json(
+        responseData("WALLET_RECHARGE_REQUEST_CREATED", { transaction }, req, true)
+      );
+    } catch (err) {
+      console.log("error", err);
+      return res.status(422).json(responseData("ERROR_OCCUR", err.message, req, false));
+    }
+  },
+  getPaymentDetails: async (req, res) => {
+    try {
+      const { paymentMethod } = req.query;
+      const Setting = require('../../models/setting.model');
+      const setting = await Setting.findOne({});
+      
+      if (!setting || !setting.paymentDetails) {
+        return res.json(responseData("PAYMENT_DETAILS_NOT_CONFIGURED", {}, req, false));
+      }
+
+      const paymentDetails = {};
+      
+      if (paymentMethod === "upi") {
+        if (setting.paymentDetails.upiId) {
+          paymentDetails.upi = {
+            upiId: setting.paymentDetails.upiId,
+            qrCode: setting.paymentDetails.upiQrCode || null
+          };
+        } else {
+          return res.json(responseData("UPI_DETAILS_NOT_CONFIGURED", {}, req, false));
+        }
+      } else if (paymentMethod === "netbanking") {
+        if (setting.paymentDetails.bankAccountNumber) {
+          paymentDetails.bankTransfer = {
+            accountNumber: setting.paymentDetails.bankAccountNumber,
+            accountName: setting.paymentDetails.bankAccountName,
+            bankName: setting.paymentDetails.bankName,
+            ifsc: setting.paymentDetails.bankIfsc,
+            branch: setting.paymentDetails.bankBranch
+          };
+        } else {
+          return res.json(responseData("BANK_TRANSFER_DETAILS_NOT_CONFIGURED", {}, req, false));
+        }
+      } else if (paymentMethod === "cheque") {
+        if (setting.paymentDetails.chequePayableTo) {
+          paymentDetails.cheque = {
+            payableTo: setting.paymentDetails.chequePayableTo,
+            address: setting.paymentDetails.chequeAddress
+          };
+        } else {
+          return res.json(responseData("CHEQUE_DETAILS_NOT_CONFIGURED", {}, req, false));
+        }
+      } else {
+        // If no paymentMethod specified, return all available methods
+        if (setting.paymentDetails.upiId) {
+          paymentDetails.upi = {
+            upiId: setting.paymentDetails.upiId,
+            qrCode: setting.paymentDetails.upiQrCode || null
+          };
+        }
+        if (setting.paymentDetails.bankAccountNumber) {
+          paymentDetails.bankTransfer = {
+            accountNumber: setting.paymentDetails.bankAccountNumber,
+            accountName: setting.paymentDetails.bankAccountName,
+            bankName: setting.paymentDetails.bankName,
+            ifsc: setting.paymentDetails.bankIfsc,
+            branch: setting.paymentDetails.bankBranch
+          };
+        }
+        if (setting.paymentDetails.chequePayableTo) {
+          paymentDetails.cheque = {
+            payableTo: setting.paymentDetails.chequePayableTo,
+            address: setting.paymentDetails.chequeAddress
+          };
+        }
+      }
+
+      return res.json(
+        responseData("PAYMENT_DETAILS", paymentDetails, req, true)
+      );
+    } catch (err) {
+      console.log("error", err);
+      return res.status(422).json(responseData("ERROR_OCCUR", err.message, req, false));
+    }
+  }
 }
 const handleSocialRegistration = async (
   registrationType,

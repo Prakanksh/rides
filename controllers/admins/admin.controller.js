@@ -206,5 +206,21 @@ createOrUpdateSettings : async (req, res) => {
      
     });
   }
+},
+listWalletRechargeRequests: async (req, res) => {
+  try {
+    await adminService.listWalletRechargeRequests(req, res)
+  } catch (err) {
+    const msg = err.message || 'SOMETHING_WENT_WRONG'
+    return res.status(422).json(responseData(msg, {}, req))
+  }
+},
+verifyWalletRecharge: async (req, res) => {
+  try {
+    await adminService.verifyWalletRecharge(req, res)
+  } catch (err) {
+    const msg = err.message || 'SOMETHING_WENT_WRONG'
+    return res.status(422).json(responseData(msg, {}, req))
+  }
 }
 }
