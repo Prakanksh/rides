@@ -1497,8 +1497,9 @@ buySubscription : async (req, res) => {
         paymentDetails: paymentDetails
       });
 
+      const transactionObj = transaction.toObject();
       return res.json(
-        responseData("WALLET_RECHARGE_REQUEST_CREATED", { transaction }, req, true)
+        responseData("WALLET_RECHARGE_REQUEST_CREATED", { transaction: transactionObj }, req, true)
       );
     } catch (err) {
       console.log("error", err);

@@ -21,5 +21,5 @@ router
 .post("/create-promocode", [verifyToken], admin.createPromoCode)
 .post("/create-setting", [verifyToken], admin.createOrUpdateSettings)
 .get("/wallet-recharge-requests", [verifyToken], admin.listWalletRechargeRequests)
-.put("/wallet-recharge/:transactionId/verify", [verifyToken], admin.verifyWalletRecharge);
+.put("/wallet-recharge/:id/verify", [verifyToken], admin.verifyWalletRecharge);
 module.exports = router

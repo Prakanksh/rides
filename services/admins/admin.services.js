@@ -495,6 +495,7 @@ listWalletRechargeRequests: async (req, res) => {
       { $unwind: { path: "$userDetails", preserveNullAndEmptyArrays: true } },
       {
         $project: {
+          _id: 1,
           transactionId: 1,
           amount: 1,
           totalAmount: 1,
@@ -553,15 +554,19 @@ listWalletRechargeRequests: async (req, res) => {
 },
 verifyWalletRecharge: async (req, res) => {
   try {
-    const { transactionId } = req.params;
+    const { id } = req.params;
     const { status, notes } = req.body;
     
     if (!status || !["completed", "failed", "cancelled"].includes(status)) {
       return res.json(responseData("INVALID_STATUS", {}, req, false));
     }
     
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.json(responseData("INVALID_TRANSACTION_ID", {}, req, false));
+    }
+    
     const transaction = await Transaction.findOne({
-      transactionId,
+      _id: id,
       transactionType: "wallet_recharge"
     });
     
