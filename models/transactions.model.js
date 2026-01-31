@@ -181,6 +181,7 @@ TransactionSchema.index({ status: 1 })
 TransactionSchema.index({ createdAt: -1 })
 TransactionSchema.index({ userId: 1 })
 TransactionSchema.index({ driverId: 1 })
+TransactionSchema.index({ paidById: 1, transactionType: 1, status: 1, createdAt: -1 })
 
 const Transaction = mongoose.model('transactions', TransactionSchema)
 

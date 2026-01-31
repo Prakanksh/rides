@@ -1580,6 +1580,67 @@ buySubscription : async (req, res) => {
       console.log("error", err);
       return res.status(422).json(responseData("ERROR_OCCUR", err.message, req, false));
     }
+  },
+  getPendingWalletRechargeRequests: async (req, res) => {
+    try {
+      const userId = req.user._id;
+      let page = parseInt(req.query.page) || 1;
+      const limit = Math.min(parseInt(req.query.pageSize) || 10, 50);
+
+      const skip = (page - 1) * limit;
+
+      const aggregationPipeline = [
+        {
+          $match: {
+            paidById: new mongoose.Types.ObjectId(userId),
+            transactionType: "wallet_recharge",
+            status: "pending"
+          }
+        },
+        { $sort: { createdAt: -1 } },
+        {
+          $facet: {
+            meta: [
+              { $count: "total" },
+              { $addFields: { page, pageSize: limit } }
+            ],
+            data: [
+              { $skip: skip },
+              { $limit: limit },
+              {
+                $project: {
+                  _id: 1,
+                  transactionId: 1,
+                  amount: 1,
+                  totalAmount: 1,
+                  paymentMethod: 1,
+                  currency: 1,
+                  status: 1,
+                  createdAt: 1,
+                  "paymentDetails.notes": 1,
+                  "paymentDetails.upiId": 1,
+                  "paymentDetails.upiTransactionId": 1,
+                  "paymentDetails.bankTransactionId": 1,
+                  "paymentDetails.transferDate": 1
+                }
+              }
+            ]
+          }
+        }
+      ];
+
+      const result = await Transaction.aggregate(aggregationPipeline);
+
+      const response = {
+        meta: result[0].meta[0] || { total: 0, page, pageSize: limit },
+        data: result[0].data || []
+      };
+
+      return res.json(responseData("GET_LIST", response, req, true));
+    } catch (err) {
+      console.log("error", err);
+      return res.status(422).json(responseData("ERROR_OCCUR", err.message, req, false));
+    }
   }
 }
 const handleSocialRegistration = async (

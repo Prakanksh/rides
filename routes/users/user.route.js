@@ -46,7 +46,8 @@ const {
   subcriptions,
   buySubscription,
   requestWalletRecharge,
-  getPaymentDetails
+  getPaymentDetails,
+  getPendingWalletRechargeRequests
 } = require('../../controllers/users/user.controller')
 const { submitSupportRequest } = require('../../services/users/user.services')
 
@@ -138,4 +139,5 @@ router
   .post('/buy-subscription/:planId', [verifyToken], buySubscription)
   .post('/wallet/recharge', [verifyToken], validationRule.validate('walletRecharge'), requestWalletRecharge)
   .get('/wallet/payment-details', [verifyToken], getPaymentDetails)
+  .get('/wallet/pending-recharge-requests', [verifyToken], getPendingWalletRechargeRequests)
 module.exports = router
