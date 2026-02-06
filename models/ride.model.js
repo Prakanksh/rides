@@ -160,9 +160,8 @@ const RideSchema = new mongoose.Schema(
       discountAmount: { type: Number, default: 0 },
       originalFare: { type: Number, default: 0 },
       promoCode: { type: String, default: null }
-    },  promoCode:{
-type: String,
-  },
+    },
+    promoCode: { type: String }
   },
 
   { timestamps: true, versionKey: false }

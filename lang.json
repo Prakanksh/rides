@@ -752,7 +752,27 @@
     "ar": ""
   },
   "RATING_SUCCESSFULLY": {
-    "en": "Rating successfully.",
+    "en": "Rating submitted successfully.",
+    "ar": ""
+  },
+  "RIDE_ID_REQUIRED": {
+    "en": "Ride ID is required.",
+    "ar": ""
+  },
+  "RATING_REQUIRED": {
+    "en": "Rating is required.",
+    "ar": ""
+  },
+  "RATING_INVALID": {
+    "en": "Rating must be between 1 and 5.",
+    "ar": ""
+  },
+  "RIDE_NOT_COMPLETED": {
+    "en": "You can only rate when ride has reached destination or is completed.",
+    "ar": ""
+  },
+  "ALREADY_RATED": {
+    "en": "You have already rated this ride.",
     "ar": ""
   },
   "ACCOUNT_DELETED": {

@@ -3,6 +3,7 @@ const { responseData } = require("../../helpers/responseData");
 const driverModel = require("../../models/driver.model");
 const driverDocument = require("../../models/driverDocument");
 const vehicleModel = require("../../models/vehicle.model");
+const Rating = require("../../models/rating.model");
 
 module.exports={
     changeStatus :async (req, res) => {
@@ -163,5 +164,25 @@ getAllDrivers: async (req, res) => {
     console.log('Error', error.message)
       return res.json(responseData('ERROR_OCCUR', {}, req, false))
   }
-}
+},
+
+  getDriverRating: async (req, res) => {
+    try {
+      const { driverId } = req.params;
+      const driver = await driverModel.findById(driverId).select('rating ratingCount').lean();
+      const averageRating = driver?.rating ?? null;
+      const ratingCount = driver?.ratingCount ?? 0;
+      const ratings = await Rating.find({ driver: driverId })
+        .sort({ createdAt: -1 }).limit(100).select('ride rider rating createdAt').lean();
+      const list = ratings.map((r) => ({
+        rideId: r.ride,
+        riderId: r.rider,
+        rating: r.rating,
+        createdAt: r.createdAt
+      }));
+      return res.json(responseData('GET_LIST', { averageRating, ratingCount, ratings: list }, req, true));
+    } catch (err) {
+      return res.json(responseData('ERROR_OCCUR', err.message, req, false));
+    }
+  }
 }

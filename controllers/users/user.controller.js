@@ -267,6 +267,14 @@ module.exports = {
       return res.status(422).json(responseData(msg, {}, req))
     }
   },
+  getDriverRating: async (req, res) => {
+    try {
+      await userService.getDriverRating(req, res)
+    } catch (err) {
+      const msg = err.message || 'SOMETHING_WENT_WRONG'
+      return res.status(422).json(responseData(msg, {}, req))
+    }
+  },
   siteVisitNotification: async (req, res) => {
     try {
       await userService.siteVisitNotification(req, res)

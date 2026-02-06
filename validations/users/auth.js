@@ -188,6 +188,14 @@ module.exports.validate = (method) => {
         validatorMiddleware
       ]
     }
+    case 'rating': {
+      return [
+        body('rideId').notEmpty().withMessage('RIDE_ID_REQUIRED'),
+        body('rating').notEmpty().withMessage('RATING_REQUIRED').isInt({ min: 1, max: 5 }).withMessage('RATING_INVALID'),
+        body('message').optional().isString().withMessage('MESSAGE_INVALID'),
+        validatorMiddleware
+      ]
+    }
     case 'walletRecharge': {
       return [
         body('paymentMethod').notEmpty().withMessage('PAYMENT_METHOD_REQUIRED').isIn(['upi', 'cheque', 'netbanking']).withMessage('INVALID_PAYMENT_METHOD'),

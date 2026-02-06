@@ -6,6 +6,7 @@ const { responseData } = require("../../helpers/responseData");
 const { ensureWallets, payByWallet, payByCash, confirmCashPayment, resolveRideFare } = require("../../helpers/walletUtil");
 const { sendToUser, sendRideToDriver } = require("../../socket/emitRide");
 const { calculateActualTime } = require("../../helpers/etaCalculator");
+const { getDriverRatingInfo } = require("../../helpers/ratingUtil");
 const adminSetting = require("../../models/setting.model");
 const adminSettingModel = require("../../models/adminSetting.model");
 
@@ -131,19 +132,23 @@ module.exports = {
       color: vehicle.color
     } : null;
 
+    const driverRating = await getDriverRatingInfo(driverId);
+
     sendToUser(ride.rider.toString(), "user:rideAccepted", { 
       ride, 
       event: "rideAccepted", 
       otp,
       driver: driverDetails,
-      vehicle: vehicleDetails
+      vehicle: vehicleDetails,
+      driverRating
     });
 
     return res.json(responseData("RIDE_ACCEPTED", { 
       ride, 
       otp,
       driver: driverDetails,
-      vehicle: vehicleDetails
+      vehicle: vehicleDetails,
+      driverRating
     }, req, true));
   },
 

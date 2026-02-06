@@ -21,6 +21,7 @@ router.put('/update-profile', verifyToken, driverController.updateProfile)
 router.post("/update-location", verifyToken, driverController.updateLocation);
 router.post("/upload-driver-docs",[verifyToken],driverDocFields,  parseMultipartJSONFields(jsonFieldsForDriver), driverDocs.uploadDocuments);
 router.post('/logout', verifyToken, driverController.logout);
-    router.post('/support/:candidateId', [verifyToken], driverController.createSupport )
+router.get('/rating', verifyToken, driverController.getMyRating);
+router.post('/support/:candidateId', [verifyToken], driverController.createSupport);
 
-module.exports = router
+module.exports = router;

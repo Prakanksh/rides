@@ -12,6 +12,7 @@ const {
   uploadImage,
   getProfile,
   updateProfile,
+  getDriverRating,
   refreshToken,
   logout,
   accountDelete,
@@ -128,7 +129,8 @@ router
     validationRule.validate('change-password'),
     changePassword
   )
-  .post('/rating', [verifyToken], rating)
+  .post('/rating', [verifyToken], validationRule.validate('rating'), rating)
+  .get('/rating/driver/:driverId', [verifyToken], getDriverRating)
   .get('/siteVisitNotification', [verifyToken], siteVisitNotification)
   .get('/category-list', [], categoryList)
   .get('/banner-list', [], bannerList)

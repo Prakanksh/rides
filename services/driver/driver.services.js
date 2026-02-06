@@ -290,5 +290,16 @@ const {candidateId} = req.params
       console.log('error', error);
       return res.status(422).json(responseData(error, {}, req, false));
     }
+  },
+
+  getMyRating: async (req, res) => {
+    try {
+      const driver = await Driver.findById(req.user?._id).select('rating ratingCount').lean();
+      const averageRating = driver?.rating ?? null;
+      const ratingCount = driver?.ratingCount ?? 0;
+      return res.json(responseData('GET_LIST', { averageRating, ratingCount }, req, true));
+    } catch (err) {
+      return res.status(422).json(responseData('ERROR_OCCUR', err.message, req, false));
+    }
   }
 };

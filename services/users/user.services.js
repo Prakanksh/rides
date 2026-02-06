@@ -39,6 +39,10 @@ const subscriptionModel = require('../../models/subscription.model')
 const Transaction = require('../../models/transactions.model')
 const userSubscriptionModel = require('../../models/userSubscription.model')
 const Admin = require('../../models/admin.model')
+const Ride = require('../../models/ride.model')
+const Driver = require('../../models/driver.model')
+const Rating = require('../../models/rating.model')
+
 module.exports = {
   refreshToken: async (req, res) => {
     try {
@@ -853,6 +857,61 @@ module.exports = {
       return res.json(responseData('ADDRESS_DELETED', {}, req, true))
     } catch (err) {
       return res.json(responseData(err.message, {}, req, false))
+    }
+  },
+  rating: async (req, res) => {
+    try {
+      const userId = req.user?._id
+      const { rideId, rating: ratingValue, message } = req.body
+      if (!userId) return res.json(responseData('NOT_AUTHORIZED', {}, req, false))
+
+      const ride = await Ride.findOne({ _id: rideId, rider: userId }).lean()
+      if (!ride) return res.json(responseData('INVALID_RIDE', {}, req, false))
+      if (!['reachedDestination', 'completed'].includes(ride.status)) return res.json(responseData('RIDE_NOT_COMPLETED', {}, req, false))
+      if (!ride.driver) return res.json(responseData('INVALID_RIDE', {}, req, false))
+
+      const existing = await Rating.findOne({ ride: rideId }).lean()
+      if (existing) return res.json(responseData('ALREADY_RATED', {}, req, false))
+
+      const ratingNum = Number(ratingValue)
+      if (ratingNum < 1 || ratingNum > 5) return res.json(responseData('RATING_INVALID', {}, req, false))
+
+      await Rating.create({ driver: ride.driver, rider: userId, ride: rideId, rating: ratingNum, ...(message != null && message !== '' && { message: String(message).trim() }) })
+
+      const driver = await Driver.findById(ride.driver).select('rating ratingCount').lean()
+      if (driver) {
+        const count = (driver.ratingCount || 0) + 1
+        const prevAvg = driver.rating != null ? driver.rating : 0
+        const prevCount = driver.ratingCount || 0
+        const newAvg = prevCount === 0 ? ratingNum : Number(((prevAvg * prevCount + ratingNum) / count).toFixed(2))
+        await Driver.updateOne({ _id: ride.driver }, { $set: { rating: newAvg, ratingCount: count } })
+      }
+
+      return res.json(responseData('RATING_SUCCESSFULLY', { rideId, rating: ratingNum, ...(message != null && message !== '' && { message: String(message).trim() }) }, req, true))
+    } catch (err) {
+      return res.status(422).json(responseData('ERROR_OCCUR', err.message, req, false))
+    }
+  },
+  getDriverRating: async (req, res) => {
+    try {
+      const userId = req.user?._id
+      const { driverId } = req.params
+      if (!userId) return res.json(responseData('NOT_AUTHORIZED', {}, req, false))
+
+      const driver = await Driver.findById(driverId).select('rating ratingCount').lean()
+      const averageRating = driver?.rating ?? null
+      const ratingCount = driver?.ratingCount ?? 0
+
+      const myRatingDoc = await Rating.findOne({ driver: driverId, rider: userId }).sort({ createdAt: -1 }).select('rating').lean()
+      const myRating = myRatingDoc?.rating ?? null
+
+      return res.json(responseData('GET_LIST', {
+        averageRating,
+        ratingCount,
+        myRating
+      }, req, true))
+    } catch (err) {
+      return res.status(422).json(responseData('ERROR_OCCUR', err.message, req, false))
     }
   },
   generatePutPresignedURL: async (req, res) => {

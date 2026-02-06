@@ -81,7 +81,9 @@ const DriverSchema = new mongoose.Schema(
       type: Boolean,
       default: true
     },
-    penalties: { type: Number, default: 0  }
+    penalties: { type: Number, default: 0 },
+    rating: { type: Number, default: null },
+    ratingCount: { type: Number, default: 0 }
   },
   { timestamps: true, versionKey: false }
 );

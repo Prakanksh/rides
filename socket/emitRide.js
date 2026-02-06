@@ -6,6 +6,7 @@ const AdminSetting = require("../models/adminSetting.model");
 const { ensureWallets, payByWallet, payByCash, confirmCashPayment, resolveRideFare } = require("../helpers/walletUtil");
 const { latLngToH3, H3_RESOLUTION } = require("../helpers/h3Util");
 const { isValidCoordinate } = require("../helpers/coordinateValidator");
+const { getDriverRatingInfo } = require("../helpers/ratingUtil");
 let ioInstance = null;
 
 const {
@@ -141,13 +142,16 @@ function initSocketIO(io) {
           color: vehicle.color
         } : null;
 
+        const driverRating = await getDriverRatingInfo(driverId);
+
         const riderSocket = getUserSocketId(ride.rider);
         const payloadToUser = { 
           ride, 
           event: "rideAccepted", 
           otp,
           driver: driverDetails,
-          vehicle: vehicleDetails
+          vehicle: vehicleDetails,
+          driverRating
         };
         if (riderSocket && ioInstance) ioInstance.to(riderSocket).emit("user:rideAccepted", payloadToUser);
         else ioInstance.to(`user:${ride.rider}`).emit("user:rideAccepted", payloadToUser);
@@ -157,7 +161,8 @@ function initSocketIO(io) {
           ride,
           driver: driverDetails,
           vehicle: vehicleDetails,
-          otp
+          otp,
+          driverRating
         });
       } catch (e) { console.error("ride:accept err", e); socket.emit("ride:accept:response", { success:false, message:"SERVER_ERROR" }); }
     });
