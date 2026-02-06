@@ -7,6 +7,8 @@ const { ensureWallets, payByWallet, payByCash, confirmCashPayment, resolveRideFa
 const { latLngToH3, H3_RESOLUTION } = require("../helpers/h3Util");
 const { isValidCoordinate } = require("../helpers/coordinateValidator");
 const { getDriverRatingInfo } = require("../helpers/ratingUtil");
+const RideChatMessage = require("../models/rideChatMessage.model");
+const { CHAT_ALLOWED_STATUSES } = require("../services/ride/rideChat.service");
 let ioInstance = null;
 
 const {
@@ -28,6 +30,7 @@ function initSocketIO(io) {
       try {
         addDriverSocket(driverId, socket.id);
         socket.join(`driver:${driverId}`);
+        socket.driverId = driverId;
         socket.emit("driver:online:ack", { ok: true });
       } catch (e) { console.error("driver:online err", e); }
     });
@@ -36,8 +39,50 @@ function initSocketIO(io) {
       try {
         addUserSocket(userId, socket.id);
         socket.join(`user:${userId}`);
+        socket.rideUserId = userId;
         socket.emit("user:connect:ack", { ok: true });
       } catch (e) { console.error("user:connect err", e); }
+    });
+
+    /* --------------------- Ride chat: join room --------------------- */
+    socket.on("ride:joinRoom", async (rideId) => {
+      try {
+        if (!rideId || !ioInstance) return;
+        const ride = await Ride.findById(rideId).select("rider driver status").lean();
+        if (!ride) return socket.emit("ride:joinRoom:response", { success: false, message: "RIDE_NOT_FOUND" });
+        if (!CHAT_ALLOWED_STATUSES.includes(ride.status)) return socket.emit("ride:joinRoom:response", { success: false, message: "CHAT_NOT_AVAILABLE" });
+        const isRider = socket.rideUserId && String(ride.rider) === String(socket.rideUserId);
+        const isDriver = socket.driverId && ride.driver && String(ride.driver) === String(socket.driverId);
+        if (!isRider && !isDriver) return socket.emit("ride:joinRoom:response", { success: false, message: "INVALID_RIDE" });
+        socket.join(`ride:${rideId}`);
+        socket.emit("ride:joinRoom:response", { success: true, rideId });
+      } catch (e) { console.error("ride:joinRoom err", e); socket.emit("ride:joinRoom:response", { success: false, message: "SERVER_ERROR" }); }
+    });
+
+    /* --------------------- Ride chat: send message --------------------- */
+    socket.on("ride:sendMessage", async ({ rideId, text }) => {
+      try {
+        if (!rideId || text == null || text === "" || !ioInstance) return socket.emit("ride:sendMessage:response", { success: false, message: "INVALID_PAYLOAD" });
+        const trimmed = String(text).trim();
+        if (!trimmed) return socket.emit("ride:sendMessage:response", { success: false, message: "TEXT_REQUIRED" });
+        const ride = await Ride.findById(rideId).select("rider driver status").lean();
+        if (!ride) return socket.emit("ride:sendMessage:response", { success: false, message: "RIDE_NOT_FOUND" });
+        if (!CHAT_ALLOWED_STATUSES.includes(ride.status)) return socket.emit("ride:sendMessage:response", { success: false, message: "CHAT_NOT_AVAILABLE" });
+        let senderId = null;
+        let senderType = null;
+        if (socket.rideUserId && String(ride.rider) === String(socket.rideUserId)) {
+          senderId = socket.rideUserId;
+          senderType = "user";
+        } else if (socket.driverId && ride.driver && String(ride.driver) === String(socket.driverId)) {
+          senderId = socket.driverId;
+          senderType = "driver";
+        }
+        if (!senderId || !senderType) return socket.emit("ride:sendMessage:response", { success: false, message: "INVALID_RIDE" });
+        const doc = await RideChatMessage.create({ ride: rideId, sender: senderId, senderType, text: trimmed });
+        const msg = { _id: doc._id, ride: doc.ride, sender: doc.sender, senderType: doc.senderType, text: doc.text, createdAt: doc.createdAt };
+        ioInstance.to(`ride:${rideId}`).emit("ride:receiveMessage", msg);
+        socket.emit("ride:sendMessage:response", { success: true, message: msg });
+      } catch (e) { console.error("ride:sendMessage err", e); socket.emit("ride:sendMessage:response", { success: false, message: "SERVER_ERROR" }); }
     });
 
     socket.on("driver:location", async (data) => {
@@ -121,6 +166,9 @@ function initSocketIO(io) {
 
         // Set driver as unavailable when ride is accepted
         await Driver.findByIdAndUpdate(driverId, { isAvailable: false });
+
+        // Auto-join driver to ride chat room
+        socket.join(`ride:${ride._id}`);
 
         // Fetch driver and vehicle details for user
         const driver = await Driver.findById(driverId).select("firstName lastName mobile countryCode rating");

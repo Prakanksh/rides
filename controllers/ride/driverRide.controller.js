@@ -1,5 +1,6 @@
 const { responseData } = require("../../helpers/responseData");
 const driverRideService = require("../../services/ride/driverRide.service");
+const rideChatService = require("../../services/ride/rideChat.service");
 
 module.exports = {
   getAssignedRide: async (req, res) => {
@@ -26,4 +27,12 @@ module.exports = {
   cancelRide: async (req, res) => {
     try { await driverRideService.cancelRide(req, res); } catch (err) { return res.json(responseData(err.message || "SOMETHING_WENT_WRONG", {}, req, false)); }
   },
+
+  getChatHistory: async (req, res) => {
+    try {
+      await rideChatService.getChatHistory(req, res, "driver");
+    } catch (err) {
+      return res.json(responseData(err.message || "SOMETHING_WENT_WRONG", {}, req, false));
+    }
+  }
 };

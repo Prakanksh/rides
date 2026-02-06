@@ -34,4 +34,7 @@ router.put("/reschedule/:rideId", verifyToken, rideController.rescheduleRide);
 // Get scheduled rides
 router.get("/scheduled", verifyToken, rideController.getScheduledRides);
 
+// Ride chat history (query: rideId)
+router.get("/chat-history", verifyToken, rideController.getChatHistory);
+
 module.exports = router;

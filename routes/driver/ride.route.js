@@ -13,4 +13,7 @@ router.post("/reachedDestination", verifyToken, rideController.reachedDestinatio
 router.post("/receivedPayment", verifyToken, rideController.receivedPayment);
 router.post("/cancel", verifyToken, rideController.cancelRide);
 
+// Ride chat history (query: rideId)
+router.get("/chat-history", verifyToken, rideController.getChatHistory);
+
 module.exports = router;

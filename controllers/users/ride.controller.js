@@ -1,5 +1,6 @@
 const { responseData } = require("../../helpers/responseData");
 const rideService = require("../../services/ride/ride.service");
+const rideChatService = require("../../services/ride/rideChat.service");
 
 module.exports = {
   createRide: async (req, res) => {
@@ -73,6 +74,14 @@ module.exports = {
   getScheduledRides: async (req, res) => {
     try {
       await rideService.getScheduledRides(req, res);
+    } catch (err) {
+      return res.json(responseData(err.message || "SOMETHING_WENT_WRONG", {}, req, false));
+    }
+  },
+
+  getChatHistory: async (req, res) => {
+    try {
+      await rideChatService.getChatHistory(req, res, "user");
     } catch (err) {
       return res.json(responseData(err.message || "SOMETHING_WENT_WRONG", {}, req, false));
     }
