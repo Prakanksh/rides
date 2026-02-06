@@ -265,21 +265,18 @@ module.exports = {
         driver: req.user._id,
         status: "reachedDestination",
         paymentMethod: "cash",
-        cashPaidByUser: true,
         paidToDriver: { $ne: true }
       });
 
       if (!ride) {
-      const checkRide = await Ride.findById(req.body.rideId);
-      if (!checkRide) return res.json(responseData("INVALID_RIDE", {}, req, false));
-      if (checkRide.status !== "reachedDestination" || checkRide.paymentMethod !== "cash") {
-        return res.json(responseData("INVALID_RIDE_STATE", {}, req, false));
-      }
-      if (!checkRide.cashPaidByUser) {
-        return res.json(responseData("USER_PAYMENT_NOT_CONFIRMED", {}, req, false));
-      }
-      if (checkRide.paidToDriver) {
-        return res.json(responseData("PAYMENT_ALREADY_CONFIRMED", {}, req, false));
+        const checkRide = await Ride.findById(req.body.rideId);
+        if (!checkRide) return res.json(responseData("INVALID_RIDE", {}, req, false));
+        if (String(checkRide.driver) !== String(req.user._id)) return res.json(responseData("RIDE_NOT_ASSIGNED_TO_DRIVER", {}, req, false));
+        if (checkRide.status !== "reachedDestination" || checkRide.paymentMethod !== "cash") {
+          return res.json(responseData("INVALID_RIDE_STATE", {}, req, false));
+        }
+        if (checkRide.paidToDriver) {
+          return res.json(responseData("PAYMENT_ALREADY_CONFIRMED", {}, req, false));
         }
         return res.json(responseData("INVALID_RIDE_STATE", {}, req, false));
       }

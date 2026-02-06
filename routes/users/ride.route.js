@@ -19,11 +19,8 @@ router.get("/get-one", verifyToken, rideController.getOneRide);
 // Get user's active ride (requested / accepted / arrived / ongoing)
 router.get("/active", verifyToken, rideController.getActiveRide);
 
-//get ride payment
+//get ride payment (amount due for cash rides)
 router.get("/paymentDue", verifyToken, rideController.paymentDue);
-
-//paid ride payment
-router.post("/paidPayment", verifyToken, rideController.paidPayment);
 
 // Cancel a ride
 router.post("/cancel", verifyToken, rideController.cancelRide);

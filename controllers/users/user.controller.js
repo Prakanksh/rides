@@ -146,6 +146,14 @@ module.exports = {
       return res.status(422).json(responseData(msg, {}, req))
     }
   },
+  uploadImage: async (req, res) => {
+    try {
+      await userService.uploadImage(req, res)
+    } catch (err) {
+      const msg = err.message || 'SOMETHING_WENT_WRONG'
+      return res.status(422).json(responseData(msg, {}, req))
+    }
+  },
   getProfile: async (req, res) => {
     try {
       await userService.getProfile(req, res)

@@ -419,6 +419,10 @@
     "en": "Image is required.",
     "ar": "تم حذف مساعد المدير بنجاح."
   },
+  "IMAGE_UPLOAD_SUCCESS": {
+    "en": "Image uploaded successfully.",
+    "ar": ""
+  },
   "KYC_DOC_REQUIRED": {
     "en": "To proceed KYC please upload at least one document image.",
     "ar": "تم حذف مساعد المدير بنجاح."

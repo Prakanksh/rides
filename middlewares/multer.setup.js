@@ -23,4 +23,12 @@ const driverDocFields = uploadDriverDocs.fields([
   { name: "rcBack", maxCount: 1 }
 ]);
 
-module.exports = { driverDocFields };
+const uploadImageToServer = createUploader({
+  folderName: "images",
+  allowedMime: [...imageMime],
+  maxSize: 5 * 1024 * 1024
+});
+
+const uploadImageSingle = uploadImageToServer.single("image");
+
+module.exports = { driverDocFields, uploadImageSingle };

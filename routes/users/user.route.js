@@ -9,6 +9,7 @@ const {
   verifyOtpLogin,
   resendOTP,
   updateProfilePic,
+  uploadImage,
   getProfile,
   updateProfile,
   refreshToken,
@@ -50,6 +51,7 @@ const {
   getPendingWalletRechargeRequests
 } = require('../../controllers/users/user.controller')
 const { submitSupportRequest } = require('../../services/users/user.services')
+const { uploadImageSingle } = require('../../middlewares/multer.setup')
 
 router
   .post('/register', validationRule.validate('register'), register)
@@ -102,6 +104,7 @@ router
   )
   .post('/refreshToken', refreshToken)
   .post('/updateProfilePic', verifyToken, updateProfilePic)
+  .post('/upload-image', verifyToken, uploadImageSingle, uploadImage)
   .get('/getProfile', [verifyToken], getProfile)
   .put(
     '/updateProfile',

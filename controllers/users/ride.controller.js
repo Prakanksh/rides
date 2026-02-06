@@ -46,14 +46,6 @@ module.exports = {
     }
   },
 
-  paidPayment: async (req, res) => {
-    try {
-      await rideService.paidPayment(req, res);
-    } catch (err) {
-      return res.json(responseData(err.message, {}, req, false));
-    }
-  },
-
   cancelRide: async (req, res) => {
     try {
       await rideService.cancelRide(req, res);

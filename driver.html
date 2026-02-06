@@ -138,7 +138,6 @@ function connectDriver() {
 
   // server-to-driver notifications
   socket.on("driver:rideCompleted", (d) => logJson("🏁 driver:rideCompleted", d));
-  socket.on("driver:paymentReceived", (d) => logJson("💵 driver:paymentReceived", d));
   socket.on("driver:rideCancelled", (d) => logJson("❌ driver:rideCancelled", d));
   
   socket.on("disconnect", () => {

@@ -401,31 +401,9 @@ async function driverReachedDestination() {
   }
 }
 
-async function userPaidPayment() {
-  try {
-    log('STEP 8: User Paid Payment');
-    const response = await axios.post(
-      `${BASE_URL}/v1/user/ride/paidPayment`,
-      { rideId: testState.rideId },
-      {
-        headers: { Authorization: `Bearer ${testState.userToken}` }
-      }
-    );
-    
-    if (response.data.success) {
-      success('User marked payment as paid');
-      return { success: true, data: response.data };
-    }
-    throw new Error('User payment failed');
-  } catch (err) {
-    error('User payment failed', err);
-    return { success: false, error: err };
-  }
-}
-
 async function driverReceivedPayment() {
   try {
-    log('STEP 9: Driver Received Payment');
+    log('STEP 8: Driver Received Payment');
     const response = await axios.post(
       `${BASE_URL}/v1/driver/ride/receivedPayment`,
       { rideId: testState.rideId },
@@ -601,15 +579,8 @@ async function testScenario1_APICashPayment() {
   results.steps.push({ name: 'Reached Destination', success: step.success });
   if (!step.success) return results;
   
-  // Payment flow
+  // Driver confirms cash payment (user already received ride + amount on reachedDestination)
   await sleep(500);
-  
-  step = await userPaidPayment();
-  results.steps.push({ name: 'User Paid', success: step.success });
-  if (!step.success) return results;
-  
-  await sleep(500);
-  
   step = await driverReceivedPayment();
   results.steps.push({ name: 'Driver Received Payment', success: step.success });
   if (!step.success) return results;

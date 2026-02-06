@@ -37,7 +37,6 @@
     </div>
 
     <div class="row">
-      <button onclick="emitPaidPayment()">user:paidPayment (cash only)</button>
       <button onclick="cancelRide()" style="background-color: #ff4444; color: white;">Cancel Ride (Socket)</button>
       <input id="cancelReason" placeholder="Cancellation reason (optional)" />
     </div>
@@ -47,7 +46,7 @@
     </div>
 
     <div class="muted">
-      You should receive: <code>user:rideAccepted</code>, <code>user:driverArrived</code>, <code>user:rideStarted</code>, live <code>driver:location</code>, and <code>user:rideCompleted</code>.
+      For cash: you receive <code>user:reachedDestination</code> with ride + <code>amountToPay</code>. Driver confirms payment; you then get <code>user:rideCompleted</code>. No user “paid” step.
     </div>
   </div>
 
@@ -119,9 +118,9 @@ function connectUser() {
     logJson("📍 driver:location", loc);
   });
 
-  // REACHED DESTINATION
+  // REACHED DESTINATION (cash: includes amountToPay; driver confirms to complete)
   socket.on("user:reachedDestination", (data) => {
-    log("📍 Reached Destination:");
+    log("📍 Reached Destination (ride + amountToPay for cash):");
     logJson("", data);
   });
 
@@ -143,7 +142,6 @@ function connectUser() {
     logJson("", data);
   });
 
-  socket.on("user:paidPayment:response", (d) => logJson("✅ user:paidPayment:response", d));
   socket.on("ride:cancel:response", (d) => logJson("✅ ride:cancel:response", d));
   socket.on("disconnect", () => log("❌ Socket disconnected"));
   socket.on("connect_error", (error) => log("❌ Connection error: " + error.message));
@@ -152,21 +150,6 @@ function connectUser() {
 function disconnectUser() {
   if (!socket) return;
   socket.disconnect();
-}
-
-function emitPaidPayment() {
-  const userId = document.getElementById("userId").value;
-  const rideId = document.getElementById("rideId").value;
-  if (!socket || !socket.connected) {
-    log("❌ Socket not connected");
-    return;
-  }
-  if (!rideId) {
-    log("❌ Please enter rideId");
-    return;
-  }
-  logJson("📤 user:paidPayment", { rideId, userId });
-  socket.emit("user:paidPayment", { rideId, userId });
 }
 
 function cancelRide() {

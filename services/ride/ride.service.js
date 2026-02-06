@@ -451,34 +451,6 @@ module.exports = {
     return res.json(responseData("PAYMENT_DUE", { rideId: ride._id, amountToPay, currency: "INR" }, req, true));
   },
 
-  paidPayment: async (req, res) => {
-    const riderId = req.user?._id;
-    const { rideId } = req.body || {};
-    if (!riderId) return res.json(responseData("NOT_AUTHORIZED", {}, req, false));
-    if (!rideId) return res.json(responseData("RIDE_ID_REQUIRED", {}, req, false));
-
-    const ride = await Ride.findOneAndUpdate(
-      { 
-        _id: rideId, 
-        rider: riderId,
-        paymentMethod: "cash",
-        status: "reachedDestination",
-        paidToDriver: { $ne: true }
-      },
-      { $set: { cashPaidByUser: true } },
-      { new: true }
-    );
-    
-    if (!ride) return res.json(responseData("INVALID_RIDE_STATE", {}, req, false));
-
-    // Notify driver that user has paid
-    if (ride.driver) {
-      sendToUser(ride.driver.toString(), "driver:userPaid", { rideId: ride._id });
-    }
-
-    return res.json(responseData("PAYMENT_MARKED", { rideId: ride._id }, req, true));
-  },
-
   getScheduledRides: async (req, res) => {
     const userId = req.user._id;
 

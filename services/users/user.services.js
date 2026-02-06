@@ -738,6 +738,22 @@ module.exports = {
       return res.status(422).json(responseData(err, {}, req, false))
     }
   },
+  uploadImage: async (req, res) => {
+    try {
+      if (isEmpty(req.file)) {
+        return res.json(responseData('IMAGE_REQUIRED', {}, req, false))
+      }
+      const baseUrl = (process.env.SERVER_IMAGE_URL || '').replace(/\/$/, '')
+      const imageUrl = baseUrl
+        ? `${baseUrl}/uploads/images/${req.file.filename}`
+        : `/uploads/images/${req.file.filename}`
+      return res.json(
+        responseData('IMAGE_UPLOAD_SUCCESS', { imageUrl }, req, true)
+      )
+    } catch (err) {
+      return res.status(422).json(responseData('ERROR_OCCUR', err.message, req, false))
+    }
+  },
   getProfile: async (req, res) => {
     try {
       const { _id } = req.user

@@ -352,6 +352,7 @@ try {
   }
 
   ride.paidToDriver = true;
+  ride.cashPaidByUser = true;
   ride.transactionId = userToDriverTx._id;
   if (!ride.paymentDetails) ride.paymentDetails = {};
   ride.paymentDetails.userPaidAmount = roundedFinalFare;
