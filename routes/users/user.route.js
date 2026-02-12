@@ -105,7 +105,7 @@ router
   )
   .post('/refreshToken', refreshToken)
   .post('/updateProfilePic', verifyToken, updateProfilePic)
-  .post('/upload-image', verifyToken, uploadImageSingle, uploadImage)
+  .post('/upload-image', uploadImageSingle, uploadImage)
   .get('/getProfile', [verifyToken], getProfile)
   .put(
     '/updateProfile',
