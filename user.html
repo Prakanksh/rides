@@ -64,6 +64,20 @@
     <input id="chatInput" placeholder="Type message..." style="width: 280px;" />
     <button onclick="sendChat()">Send</button>
   </div>
+  <div class="row">
+    <button id="audioCallBtn" onclick="startRideAudioCall()" style="background:#0a0;color:#fff;">🎤 Call driver</button>
+  </div>
+  <div id="audioCallContainer" style="display:none; position:fixed; bottom:20px; right:20px; width:220px; background:#1a1a2e; color:#fff; padding:14px; border-radius:10px; z-index:1000; box-shadow:0 4px 20px rgba(0,0,0,0.4); border:1px solid rgba(255,255,255,0.1);">
+    <p id="audioCallStatus" style="margin:0 0 12px; font-size:13px;">Calling...</p>
+    <button onclick="endRideAudioCall()" style="background:#c00; color:#fff; border:none; padding:8px 16px; border-radius:6px; cursor:pointer; font-size:13px; width:100%;">End call</button>
+  </div>
+  <div id="incomingCallModal" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); background:#1e3a5f; color:#fff; padding:24px; border-radius:12px; z-index:2000; box-shadow:0 8px 32px rgba(0,0,0,0.5); text-align:center; min-width:280px;">
+    <p id="incomingCallText" style="margin:0 0 20px; font-size:16px;">Incoming audio call from driver</p>
+    <div style="display:flex; gap:12px; justify-content:center;">
+      <button onclick="acceptIncomingRideCall()" style="background:#0a0; color:#fff; border:none; padding:12px 24px; border-radius:8px; cursor:pointer; font-size:14px;">Accept</button>
+      <button onclick="rejectIncomingRideCall()" style="background:#c00; color:#fff; border:none; padding:12px 24px; border-radius:8px; cursor:pointer; font-size:14px;">Reject</button>
+    </div>
+  </div>
   </div>
 
   <div class="card">
@@ -73,9 +87,22 @@
 </div>
 
 <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+<script src="https://cdn.agora.io/sdk/release/AgoraRTC_N-4.14.0.js"></script>
 <script>
 let socket;
 const logBox = document.getElementById("log");
+let rideAudioCallId = null;
+let rideAudioClient = null;
+let rideLocalAudioTrack = null;
+let agoraAppId = "";
+let pendingIncomingCall = null;
+let incomingCallTimeout = null;
+let userInitiatedThisCall = false;
+let userInitiatedCall = false;
+(function getAgoraAppId() {
+  const base = document.getElementById("socketUrl").value;
+  fetch(base + "/v1/agora-app-id").then(r => r.json()).then(d => { if (d && d.appId) agoraAppId = d.appId; }).catch(() => {});
+})();
 
 function log(msg) {
   logBox.textContent += msg + "\n";
@@ -108,7 +135,14 @@ function connectUser() {
 
   socket.emit("user:connect", userId);
   logJson("📤 user:connect", { userId });
-  socket.on("user:connect:ack", (d) => logJson("✅ user:connect:ack", d));
+  socket.on("user:connect:ack", (d) => {
+    logJson("✅ user:connect:ack", d);
+    var rideIdInput = document.getElementById("rideId").value.trim();
+    if (rideIdInput) {
+      socket.emit("ride:joinRoom", rideIdInput);
+      log("📤 Auto ride:joinRoom (reconnect) " + rideIdInput);
+    }
+  });
 
   // NEW RIDE ACCEPTED — auto-join chat room so user receives driver messages
   socket.on("user:rideAccepted", (data) => {
@@ -176,6 +210,46 @@ function connectUser() {
   });
   socket.on("ride:sendMessage:response", (d) => {
     logJson("💬 ride:sendMessage:response", d);
+  });
+
+  socket.on("ride:incomingAudioCall", (data) => {
+    if (data.callerType === "rider") return;
+    userInitiatedThisCall = false;
+    logJson("📞 ride:incomingAudioCall", data);
+    if (pendingIncomingCall && incomingCallTimeout) clearTimeout(incomingCallTimeout);
+    pendingIncomingCall = data;
+    rideAudioCallId = data.callId;
+    document.getElementById("incomingCallText").textContent = "Incoming audio call from driver";
+    document.getElementById("incomingCallModal").style.display = "block";
+    incomingCallTimeout = setTimeout(function() {
+      if (pendingIncomingCall && pendingIncomingCall.callId === data.callId) {
+        document.getElementById("incomingCallModal").style.display = "none";
+        socket.emit("ride:rejectAudioCall", { rideId: data.rideId, callId: data.callId });
+        log("📞 Call missed (timeout)");
+        pendingIncomingCall = null;
+      }
+      incomingCallTimeout = null;
+    }, 45000);
+  });
+  socket.on("ride:audioCallAccepted", (data) => {
+    logJson("📞 ride:audioCallAccepted", data);
+    rideAudioCallId = data.callId;
+    document.getElementById("audioCallContainer").style.display = "block";
+    document.getElementById("audioCallStatus").textContent = "Connecting...";
+    var token = userInitiatedThisCall ? data.callerToken : data.receiverToken;
+    var uid = userInitiatedThisCall ? 0 : 1;
+    startRideAudioCallJoin(data.channel, token, uid);
+  });
+  socket.on("ride:audioCallRejected", () => { userInitiatedThisCall = false; log("📞 Call rejected"); document.getElementById("audioCallContainer").style.display = "none"; document.getElementById("incomingCallModal").style.display = "none"; pendingIncomingCall = null; rideAudioCallId = null; });
+  socket.on("ride:audioCallEnded", (d) => { log("📞 Call ended" + (d.duration ? " (" + d.duration + "s)" : "")); endRideAudioCall(); });
+  socket.on("ride:audioCall:response", (d) => {
+    logJson("📞 ride:audioCall:response", d);
+    if (d && d.success && d.callId) {
+      rideAudioCallId = d.callId;
+      userInitiatedThisCall = true;
+      document.getElementById("audioCallContainer").style.display = "block";
+      document.getElementById("audioCallStatus").textContent = "Calling driver...";
+    }
   });
 
   socket.on("disconnect", () => log("❌ Socket disconnected"));
@@ -256,6 +330,71 @@ function sendChat() {
   document.getElementById("chatInput").value = "";
   appendChatMessage({ senderType: "user", text: text, createdAt: new Date() });
   log("📤 ride:sendMessage " + text);
+}
+
+function acceptIncomingRideCall() {
+  if (!pendingIncomingCall || !socket || !socket.connected) return;
+  if (incomingCallTimeout) { clearTimeout(incomingCallTimeout); incomingCallTimeout = null; }
+  var data = pendingIncomingCall;
+  pendingIncomingCall = null;
+  document.getElementById("incomingCallModal").style.display = "none";
+  socket.emit("ride:acceptAudioCall", { rideId: data.rideId, callId: data.callId });
+  startRideAudioCallJoin(data.channel, data.callerToken);
+}
+function rejectIncomingRideCall() {
+  if (!pendingIncomingCall || !socket || !socket.connected) return;
+  if (incomingCallTimeout) { clearTimeout(incomingCallTimeout); incomingCallTimeout = null; }
+  var data = pendingIncomingCall;
+  pendingIncomingCall = null;
+  document.getElementById("incomingCallModal").style.display = "none";
+  socket.emit("ride:rejectAudioCall", { rideId: data.rideId, callId: data.callId });
+  log("📞 Call rejected");
+}
+
+function startRideAudioCall() {
+  const rideId = document.getElementById("rideId").value.trim();
+  if (!socket || !socket.connected) { log("❌ Connect first."); return; }
+  if (!rideId) { log("❌ Enter Ride ID."); return; }
+  log("📤 ride:startAudioCall " + rideId);
+  socket.emit("ride:startAudioCall", { rideId });
+}
+
+async function startRideAudioCallJoin(channel, token, uid) {
+  if (!agoraAppId) { log("❌ Agora App ID not loaded. Refresh and try again."); return; }
+  if (uid == null) uid = 0;
+  document.getElementById("audioCallContainer").style.display = "block";
+  document.getElementById("audioCallStatus").textContent = "Connecting...";
+  try {
+    rideAudioClient = AgoraRTC.createClient({ mode: "rtc", codec: "vp8" });
+    rideAudioClient.on("user-published", async (user, type) => {
+      await rideAudioClient.subscribe(user, type);
+      if (type === "audio") user.audioTrack.play();
+    });
+    await rideAudioClient.join(agoraAppId, channel, token, uid);
+    rideLocalAudioTrack = await AgoraRTC.createMicrophoneAudioTrack();
+    await rideAudioClient.publish([rideLocalAudioTrack]);
+    document.getElementById("audioCallStatus").textContent = "Call is active";
+    log("📞 Joined audio channel");
+  } catch (err) {
+    log("📞 Audio join error: " + err.message);
+    console.error(err);
+    var el = document.getElementById("audioCallStatus");
+    if (el) el.textContent = "Connection failed";
+  }
+}
+
+function endRideAudioCall() {
+  if (rideLocalAudioTrack) { try { rideLocalAudioTrack.stop(); rideLocalAudioTrack.close(); } catch (e) {} }
+  rideLocalAudioTrack = null;
+  if (rideAudioClient) { try { rideAudioClient.leave(); } catch (e) {} }
+  rideAudioClient = null;
+  document.getElementById("audioCallContainer").style.display = "none";
+  if (rideAudioCallId && socket && socket.connected) {
+    const rideId = document.getElementById("rideId").value.trim();
+    if (rideId) socket.emit("ride:endAudioCall", { rideId, callId: rideAudioCallId });
+  }
+  rideAudioCallId = null;
+  userInitiatedThisCall = false;
 }
 </script>
 </body>

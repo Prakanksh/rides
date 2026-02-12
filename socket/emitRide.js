@@ -8,8 +8,23 @@ const { latLngToH3, H3_RESOLUTION } = require("../helpers/h3Util");
 const { isValidCoordinate } = require("../helpers/coordinateValidator");
 const { getDriverRatingInfo } = require("../helpers/ratingUtil");
 const RideChatMessage = require("../models/rideChatMessage.model");
+const RideCall = require("../models/rideCall.model");
 const { CHAT_ALLOWED_STATUSES } = require("../services/ride/rideChat.service");
+const { generateRtcToken } = require("../helpers/agora");
 let ioInstance = null;
+
+const RIDE_CALL_CHANNEL_PREFIX = "call_ride_";
+
+async function getRideAndCaller(rideId, socket) {
+  if (!rideId || !socket) return null;
+  const ride = await Ride.findById(rideId).select("rider driver status").lean();
+  if (!ride || !CHAT_ALLOWED_STATUSES.includes(ride.status)) return null;
+  const isRider = socket.rideUserId && String(ride.rider) === String(socket.rideUserId);
+  const isDriver = socket.driverId && ride.driver && String(ride.driver) === String(socket.driverId);
+  if (isRider) return { ride, callerId: ride.rider, callerType: "rider", receiverId: ride.driver };
+  if (isDriver) return { ride, callerId: ride.driver, callerType: "driver", receiverId: ride.rider };
+  return null;
+}
 
 const {
   addDriverSocket,
@@ -26,11 +41,16 @@ function initSocketIO(io) {
   ioInstance = io;
 
   io.on("connection", (socket) => {
-    socket.on("driver:online", (driverId) => {
+    socket.on("driver:online", async (driverId) => {
       try {
         addDriverSocket(driverId, socket.id);
         socket.join(`driver:${driverId}`);
         socket.driverId = driverId;
+        const activeRide = await Ride.findOne({
+          driver: driverId,
+          status: { $in: ["accepted", "arrived", "ongoing", "reachedDestination"] }
+        }).select("_id").lean();
+        if (activeRide) socket.join(`ride:${activeRide._id}`);
         socket.emit("driver:online:ack", { ok: true });
       } catch (e) { console.error("driver:online err", e); }
     });
@@ -83,6 +103,106 @@ function initSocketIO(io) {
         ioInstance.to(`ride:${rideId}`).emit("ride:receiveMessage", msg);
         socket.emit("ride:sendMessage:response", { success: true, message: msg });
       } catch (e) { console.error("ride:sendMessage err", e); socket.emit("ride:sendMessage:response", { success: false, message: "SERVER_ERROR" }); }
+    });
+
+    //  --------------------- Ride audio call --------------------- 
+    socket.on("ride:startAudioCall", async (payload) => {
+      try {
+        const { rideId } = payload || {};
+        if (!rideId || !ioInstance) return socket.emit("ride:audioCall:response", { success: false, message: "INVALID_PAYLOAD" });
+        const ctx = await getRideAndCaller(rideId, socket);
+        if (!ctx) return socket.emit("ride:audioCall:response", { success: false, message: "INVALID_RIDE_OR_STATE" });
+        const { ride, callerId, callerType, receiverId } = ctx;
+        const channel = RIDE_CALL_CHANNEL_PREFIX + rideId;
+        let callerToken;
+        try {
+          callerToken = generateRtcToken(channel, 0);
+        } catch (err) {
+          console.error("ride:startAudioCall token err", err);
+          return socket.emit("ride:audioCall:response", { success: false, message: "TOKEN_ERROR" });
+        }
+        const callDoc = await RideCall.create({
+          ride: rideId,
+          callerId,
+          callerType,
+          channel,
+          status: "ringing"
+        });
+        const callId = callDoc._id.toString();
+        const payloadToRoom = {
+          rideId,
+          callId,
+          channel,
+          callerId: callerId.toString(),
+          callerType,
+          receiverId: receiverId ? receiverId.toString() : null,
+          callerToken
+        };
+        ioInstance.to(`ride:${rideId}`).emit("ride:incomingAudioCall", payloadToRoom);
+        socket.emit("ride:audioCall:response", { success: true, callId });
+      } catch (e) { console.error("ride:startAudioCall err", e); socket.emit("ride:audioCall:response", { success: false, message: "SERVER_ERROR" }); }
+    });
+
+    socket.on("ride:acceptAudioCall", async (payload) => {
+      try {
+        const { rideId, callId } = payload || {};
+        if (!rideId || !callId || !ioInstance) return socket.emit("ride:audioCall:response", { success: false, message: "INVALID_PAYLOAD" });
+        const ctx = await getRideAndCaller(rideId, socket);
+        if (!ctx) return socket.emit("ride:audioCall:response", { success: false, message: "INVALID_RIDE_OR_STATE" });
+        const callDoc = await RideCall.findOne({ _id: callId, ride: rideId, status: "ringing" });
+        if (!callDoc) return socket.emit("ride:audioCall:response", { success: false, message: "CALL_NOT_FOUND_OR_ENDED" });
+        const callerToken = generateRtcToken(callDoc.channel, 0);
+        const receiverToken = generateRtcToken(callDoc.channel, 1);
+        callDoc.status = "accepted";
+        callDoc.startTime = new Date();
+        await callDoc.save();
+        const payloadToRoom = {
+          rideId,
+          callId,
+          channel: callDoc.channel,
+          callerToken,
+          receiverToken
+        };
+        ioInstance.to(`ride:${rideId}`).emit("ride:audioCallAccepted", payloadToRoom);
+        socket.emit("ride:audioCall:response", { success: true });
+      } catch (e) { console.error("ride:acceptAudioCall err", e); socket.emit("ride:audioCall:response", { success: false, message: "SERVER_ERROR" }); }
+    });
+
+    socket.on("ride:rejectAudioCall", async (payload) => {
+      try {
+        const { rideId, callId } = payload || {};
+        if (!rideId || !callId || !ioInstance) return;
+        const ctx = await getRideAndCaller(rideId, socket);
+        if (!ctx) return;
+        const callDoc = await RideCall.findOne({ _id: callId, ride: rideId });
+        if (callDoc && callDoc.status === "ringing") {
+          callDoc.status = "rejected";
+          callDoc.endTime = new Date();
+          callDoc.duration = 0;
+          await callDoc.save();
+          ioInstance.to(`ride:${rideId}`).emit("ride:audioCallRejected", { rideId, callId });
+        }
+      } catch (e) { console.error("ride:rejectAudioCall err", e); }
+    });
+
+    socket.on("ride:endAudioCall", async (payload) => {
+      try {
+        const { rideId, callId } = payload || {};
+        if (!rideId || !callId || !ioInstance) return;
+        const ctx = await getRideAndCaller(rideId, socket);
+        if (!ctx) return;
+        const callDoc = await RideCall.findOne({ _id: callId, ride: rideId });
+        if (callDoc && callDoc.status !== "ended" && callDoc.status !== "rejected") {
+          const now = new Date();
+          callDoc.status = "ended";
+          callDoc.endTime = now;
+          callDoc.duration = callDoc.startTime
+            ? Math.round((now - callDoc.startTime) / 1000)
+            : 0;
+          await callDoc.save();
+          ioInstance.to(`ride:${rideId}`).emit("ride:audioCallEnded", { rideId, callId, duration: callDoc.duration });
+        }
+      } catch (e) { console.error("ride:endAudioCall err", e); }
     });
 
     socket.on("driver:location", async (data) => {
@@ -227,6 +347,8 @@ function initSocketIO(io) {
         ride.actualArrivalTime = new Date(); 
         ride.updatedAt = new Date();
         await ride.save();
+
+        socket.join(`ride:${rideId}`);
 
         const riderSocket = getUserSocketId(ride.rider);
         const dataForUser = { rideId: ride._id, event: "driverArrived" };

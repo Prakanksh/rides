@@ -111,6 +111,12 @@ app.get('/', (req, res) => {
   res.send(`API is Running on Port ${process.env.PORT}`);
 });
 
+// Agora App ID for frontend testing(ride audio calls) – app id is public
+app.get('/v1/agora-app-id', (req, res) => {
+  const appId = process.env.AGORA_APP_KEY || '';
+  res.json({ success: true, appId });
+});
+
 // -------------------------
 // ADMIN ROUTES
 // -------------------------
