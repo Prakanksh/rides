@@ -48,6 +48,22 @@
     <div class="muted">
       For cash: you receive <code>user:reachedDestination</code> with ride + <code>amountToPay</code>. Driver confirms payment; you then get <code>user:rideCompleted</code>. No user “paid” step.
     </div>
+
+  <hr style="margin: 16px 0;" />
+  <div class="row"><b>Ride Chat</b></div>
+  <div class="row">
+    <button onclick="joinChat()">Join chat room</button>
+    <span class="muted">Use Ride ID above. Join after ride accepted.</span>
+  </div>
+  <div class="row">
+    <input id="userToken" placeholder="User token (optional, for Load history)" style="width:100%;" />
+    <button onclick="loadChatHistory()">Load history</button>
+  </div>
+  <div id="chatMessages" class="card" style="min-height: 120px; max-height: 200px; overflow-y: auto; margin: 8px 0;"></div>
+  <div class="row">
+    <input id="chatInput" placeholder="Type message..." style="width: 280px;" />
+    <button onclick="sendChat()">Send</button>
+  </div>
   </div>
 
   <div class="card">
@@ -94,11 +110,16 @@ function connectUser() {
   logJson("📤 user:connect", { userId });
   socket.on("user:connect:ack", (d) => logJson("✅ user:connect:ack", d));
 
-  // NEW RIDE ACCEPTED
+  // NEW RIDE ACCEPTED — auto-join chat room so user receives driver messages
   socket.on("user:rideAccepted", (data) => {
     log("🎉 Ride Accepted:");
     logJson("", data);
     document.getElementById("rideId").value = data.ride._id;
+    const rideId = data.ride && data.ride._id;
+    if (rideId) {
+      socket.emit("ride:joinRoom", rideId);
+      log("📤 Auto ride:joinRoom " + rideId);
+    }
   });
 
   // DRIVER ARRIVED
@@ -143,6 +164,20 @@ function connectUser() {
   });
 
   socket.on("ride:cancel:response", (d) => logJson("✅ ride:cancel:response", d));
+
+  // Ride chat
+  socket.on("ride:joinRoom:response", (d) => {
+    logJson("💬 ride:joinRoom:response", d);
+    if (d && d.success) log("💬 Joined ride chat room.");
+  });
+  socket.on("ride:receiveMessage", (msg) => {
+    logJson("💬 ride:receiveMessage", msg);
+    appendChatMessage(msg);
+  });
+  socket.on("ride:sendMessage:response", (d) => {
+    logJson("💬 ride:sendMessage:response", d);
+  });
+
   socket.on("disconnect", () => log("❌ Socket disconnected"));
   socket.on("connect_error", (error) => log("❌ Connection error: " + error.message));
 }
@@ -169,6 +204,58 @@ function cancelRide() {
   
   logJson("📤 ride:cancel:user", { rideId, userId, reason });
   socket.emit("ride:cancel:user", { rideId, userId, reason });
+}
+
+function joinChat() {
+  const rideId = document.getElementById("rideId").value.trim();
+  if (!socket || !socket.connected) { log("❌ Connect first."); return; }
+  if (!rideId) { log("❌ Enter Ride ID (e.g. after ride accepted)."); return; }
+  socket.emit("ride:joinRoom", rideId);
+  log("📤 ride:joinRoom " + rideId);
+}
+
+async function loadChatHistory() {
+  const rideId = document.getElementById("rideId").value.trim();
+  const token = document.getElementById("userToken").value.trim();
+  if (!rideId) { log("❌ Enter Ride ID."); return; }
+  if (!token) { log("❌ Enter user token to load history."); return; }
+  try {
+    const res = await fetch(document.getElementById("socketUrl").value + "/v1/user/ride/chat-history?rideId=" + rideId, {
+      headers: { Authorization: "Bearer " + token }
+    });
+    const data = await res.json();
+    if (data.success && Array.isArray(data.results)) {
+      document.getElementById("chatMessages").innerHTML = "";
+      data.results.forEach((m) => appendChatMessage(m));
+      log("💬 Loaded " + data.results.length + " messages.");
+    } else log("💬 " + (data.message || "Failed to load history"));
+  } catch (e) { log("💬 Load history error: " + e.message); }
+}
+
+function appendChatMessage(msg) {
+  const el = document.getElementById("chatMessages");
+  const div = document.createElement("div");
+  div.style.marginBottom = "6px";
+  div.style.padding = "4px 8px";
+  div.style.borderRadius = "6px";
+  div.style.background = msg.senderType === "user" ? "#dcf8c6" : "#fff";
+  div.style.borderLeft = msg.senderType === "driver" ? "3px solid #333" : "3px solid #0a0";
+  const time = msg.createdAt ? new Date(msg.createdAt).toLocaleTimeString() : "";
+  div.textContent = (msg.senderType === "driver" ? "Driver: " : "You: ") + (msg.text || "") + (time ? " (" + time + ")" : "");
+  el.appendChild(div);
+  el.scrollTop = el.scrollHeight;
+}
+
+function sendChat() {
+  const rideId = document.getElementById("rideId").value.trim();
+  const text = (document.getElementById("chatInput").value || "").trim();
+  if (!socket || !socket.connected) { log("❌ Connect first."); return; }
+  if (!rideId) { log("❌ Enter Ride ID."); return; }
+  if (!text) { log("❌ Enter message."); return; }
+  socket.emit("ride:sendMessage", { rideId, text });
+  document.getElementById("chatInput").value = "";
+  appendChatMessage({ senderType: "user", text: text, createdAt: new Date() });
+  log("📤 ride:sendMessage " + text);
 }
 </script>
 </body>
